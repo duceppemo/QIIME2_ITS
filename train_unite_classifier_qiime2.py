@@ -8,6 +8,7 @@ import urllib.request
 import tarfile
 from argparse import ArgumentParser
 from multiprocessing import cpu_count
+from qiime2_methods import Qiime2Methods
 
 
 class Qiime2Trainer(object):
@@ -57,22 +58,12 @@ class Qiime2Trainer(object):
     def checks(self):
         # Check output folder
         if not os.path.exists(self.output_folder):
-            Qiime2Trainer.make_folder(self.output_folder)  # Create output folder is does not exists already
+            Qiime2Methods.make_folder(self.output_folder)  # Create output folder is does not exists already
 
         # Check if qiime2 conda environment is activated
         if 'qiime2' not in os.environ['CONDA_DEFAULT_ENV']:
             raise Exception('You must activate your QIIME2 conda environment to run this script. '
                             '"conda activate qiime2-2020.8"')
-
-    @staticmethod
-    def make_folder(folder):
-        """
-        Create output folder.
-        :param folder: string. Output folder path.
-        :return:
-        """
-        # Will create parent directories if don't exist and will not return error if already exists
-        pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def download(url, file_path):
@@ -209,17 +200,3 @@ if __name__ == '__main__':
     arguments = parser.parse_args()
 
     Qiime2Trainer(arguments)
-
-
-"""
-#!/bin/bash
-
-####
-# Train Classifier
-####
-
-
-
-
-
-"""

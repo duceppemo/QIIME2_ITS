@@ -6,10 +6,7 @@ import pathlib
 from argparse import ArgumentParser
 from concurrent import futures
 from multiprocessing import cpu_count
-
-
-__author__ = 'duceppemo'
-__version__ = '0.1'
+from qiime2_methodss import Qiime2Methods
 
 
 class FastqRC(object):
@@ -42,7 +39,7 @@ class FastqRC(object):
         # Run all checks to make sure the script runs smoothly
         self.checks()
         # Create a list of all the fastq files in the input folder
-        fastq_list = FastqRC.list_fastq(self.input_folder)
+        fastq_list = Qiime2Methods.list_fastq(self.input_folder)
 
         # Parallel process fastq files
         print('Processing:')
@@ -68,25 +65,8 @@ class FastqRC(object):
         if self.output_folder == self.input_folder:
             raise Exception('Please choose a different output folder than the input folder')
         if not os.path.exists(self.output_folder):
-            FastqRC.make_folder(self.output_folder)  # Create output folder is does not exists already
-
-    @staticmethod
-    def list_fastq(my_path):
-        """
-        Walk input directory and list all the fastq files. Accepted file extensions are '.fastq', '.fastq.gz',
-        '.fq' and '.fq.gz'.
-        :param my_path: string. Input folder path
-        :return: list of strings. Fastq files in input folder
-        """
-        # Create empty list to hold the file paths
-        fastq_list = list()
-        # Walk the input directory recursively and look for fastq files
-        for root, directories, filenames in os.walk(my_path):
-            for filename in filenames:
-                absolute_path = os.path.join(root, filename)
-                if os.path.isfile(absolute_path) and filename.endswith(('.fastq', '.fastq.gz', '.fq', '.fq.gz')):
-                    fastq_list.append(absolute_path)  # Add fastq file path to the list
-        return fastq_list
+            # Create output folder is does not exists already
+            Qiime2Methods.make_folder() .make_folder(self.output_folder)
 
     @staticmethod
     def rc_fastq_parallel(fastq_list, out_folder, ncpu):
@@ -143,16 +123,6 @@ class FastqRC(object):
                     elif counter == 4:  # Quality line
                         out_f.write('{}\n'.format(line[::-1]).encode())  # reverse
                         counter = 0  # Reset counter because each fastq entry in a file always have 4 lines
-
-    @staticmethod
-    def make_folder(folder):
-        """
-        Create output folder.
-        :param folder: string. Output folder path.
-        :return:
-        """
-        # Will create parent directories if don't exist and will not return error if already exists
-        pathlib.Path(folder).mkdir(parents=True, exist_ok=True)
 
 
 if __name__ == '__main__':
