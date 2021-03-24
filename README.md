@@ -16,6 +16,8 @@ L2S357_15_L001_R1_001.fastq.gz. The underscore-separated fields in this file nam
 ```
 If metadata file and fastq files are not properly formated, this pipeline will crash.
 
+Please make sure that your samples are already demultiplexed, i.e. you have one fastq file per sample.
+
 ## Installation
 
 1. Make sure you have conda installed. See https://docs.conda.io/en/latest/miniconda.html for `miniconda` installation instructions. You may prefer to install `anaconda`. `mamba` can also be installed afterward to speedup environment creation and package installation.
