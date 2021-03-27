@@ -26,15 +26,19 @@ Please make sure that your samples are already demultiplexed, i.e. you have one 
 ```
 conda activate qiime2-2021.2  # Version number may differ depending of time of installation.
 ```
-4. Clone this repository (make sure `git` is installed in your environment. Use `conda install git` if needed):
+4. Install ITSxpress
+```
+conda install -c bioconda itsxpress
+```
+5. Clone this repository (make sure `git` is installed in your environment. Use `conda install git` if needed):
 ```
 git clone https://github.com/duceppemo/IonTorrent_Fungi_Barcoding_QIIME2
 ```
-5. `cd` into cloned repository:
+6. `cd` into cloned repository:
 ```
 cd IonTorrent_Fungi_Barcoding_QIIME2
 ```
-6. Test pipeline:
+7. Test pipeline:
 ```
 python run_qiime2.py -h
 ```

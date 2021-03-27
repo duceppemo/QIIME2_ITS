@@ -2,7 +2,6 @@
 
 import os
 import gzip
-import pathlib
 from argparse import ArgumentParser
 from concurrent import futures
 from multiprocessing import cpu_count

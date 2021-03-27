@@ -1,7 +1,9 @@
 #!/usr/local/env python3
 
+import os
 import pathlib
 import subprocess
+from concurrent import futures
 
 
 class Qiime2Methods(object):
@@ -33,6 +35,31 @@ class Qiime2Methods(object):
                 if os.path.isfile(absolute_path) and filename.endswith(('.fastq', '.fastq.gz', '.fq', '.fq.gz')):
                     fastq_list.append(absolute_path)  # Add fastq file path to the list
         return fastq_list
+
+    @staticmethod
+    def extract_its(fastq_file, output_folder, cpu):
+        cmd = ['itsxpress',
+               '--threads', str(cpu),
+               '--single_end',
+               '--fastq', fastq_file,
+               '--region', 'ITS1',
+               '--taxa', 'Fungi',
+               '--cluster_id', str(0.99),
+               '--outfile', output_folder + '/' + os.path.basename(fastq_file),
+               '--log',  output_folder + '/log/' + os.path.basename(fastq_file).split('_')[0] + '.log',
+               '--threads', str(cpu)]
+        subprocess.run(cmd)
+
+    @staticmethod
+    def extract_its_parallel(fastq_list, output_folder, cpu):
+        with futures.ThreadPoolExecutor(max_workers=cpu / 4) as executor:
+            args = ((fastq, output_folder, cpu / 4) for fastq in fastq_list)
+            for results in executor.map(lambda p: Qiime2Methods.extract_its(*p), args):  # (*p) does the unpacking part
+                pass
+
+    @staticmethod
+    def fix_fastq(fastq_file):
+        cmd = ['python', ]
 
     @staticmethod
     def qiime2_import_fastq(input_path, output_path):
