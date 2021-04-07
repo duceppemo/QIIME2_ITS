@@ -38,6 +38,13 @@ class Qiime2Methods(object):
 
     @staticmethod
     def extract_its(fastq_file, output_folder, cpu):
+        """
+        Extract Fungi ITS1 sequence from fastq files. Use ITSxpress program.
+        :param fastq_file: string. Fastq file path
+        :param output_folder: string. Path of output folder.
+        :param cpu: int. number of CPU to use.
+        :return:
+        """
         cmd = ['itsxpress',
                '--threads', str(cpu),
                '--single_end',
@@ -52,6 +59,13 @@ class Qiime2Methods(object):
 
     @staticmethod
     def extract_its_parallel(fastq_list, output_folder, cpu):
+        """
+        Run "extract_its" in parallel using 4 cores per instance.
+        :param fastq_list: string. A list of fastq file paths.
+        :param output_folder: sting. Path of output folder
+        :param cpu: int. Number of cpu to use.
+        :return:
+        """
         with futures.ThreadPoolExecutor(max_workers=cpu / 4) as executor:
             args = ((fastq, output_folder, cpu / 4) for fastq in fastq_list)
             for results in executor.map(lambda p: Qiime2Methods.extract_its(*p), args):  # (*p) does the unpacking part
@@ -59,166 +73,230 @@ class Qiime2Methods(object):
 
     @staticmethod
     def fix_fastq(fastq_file):
-        cmd = ['python', ]
+        """
+        Remove empty entries from a fastq file. Overwrites the input file with the output file.
+        :param fastq_file: string. Path of a fastq file, gzipped or not.
+        :return:
+        """
+        cmd = ['python', 'remove_empty_fastq_entries.py',
+               '-i', fastq_file]
+        subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_import_fastq(input_path, output_path):
+    def fix_fastq_parallel(fastq_list, cpu):
         """
-        Import fastq files
+        Run "fix_fastq" in parallel using all the threads, one file per thread
+        :param fastq_list: string. list of fastq file paths
+        :param cpu: int. number of CPU to use
+        :return:
+        """
+        with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
+            args = (fastq for fastq in fastq_list)
+            for results in executor.map(Qiime2Methods.extract_its, args):
+                pass
+
+    @staticmethod
+    def qiime2_import_fastq_se(fastq_folder, reads_qza):
+        """
+        Import single-end fastq files
         https://docs.qiime2.org/2020.8/tutorials/importing/
-        :param input_path:
-        :param output_path:
+        :param fastq_folder:
+        :param reads_qza:
         :return:
         """
         cmd = ['qiime', 'tools', 'import',
                '--type', 'SampleData[SequencesWithQuality]',
                '--input-format', 'CasavaOneEightSingleLanePerSampleDirFmt',  # For demultiplexed single end fastq
-               '--input-path', input_path,
-               '--output-path', output_path]
+               '--input-path', fastq_folder,
+               '--output-path', reads_qza]
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_demux_summary(input_folder, output_folder):
+    def qiime2_import_fastq_pe(fastq_folder, reads_qza):
+        """
+        Import paired-end fastq files
+        https://docs.qiime2.org/2020.8/tutorials/importing/
+        :param fastq_folder:
+        :param reads_qza:
+        :return:
+        """
+        cmd = ['qiime', 'tools', 'import',
+               '--type', 'SampleData[PairedEndSequencesWithQuality]',
+               '--input-format', 'casava-18-paired-end-demultiplexed',  # For demultiplexed paired-end fastq
+               '--input-path', fastq_folder,
+               '--output-path', reads_qza]
+        subprocess.run(cmd)
+
+    @staticmethod
+    def qiime2_demux_summary(reads_qza, output_qzv):
         """
         Make summary of samples
         Subsample 10,000 reads by default, only use 1000 instead (faster)
-        :param input_folder:
-        :param output_folder:
+        :param reads_qza:
+        :param output_qzv:
         :return:
         """
         cmd = ['qiime', 'demux', 'summary',
                '--p-n', str(1000),
-               '--i-data', input_folder,
-               '--o-visualization', output_folder + '/demux-single-end.qzv']
+               '--i-data', reads_qza,
+               '--o-visualization', output_qzv]
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_dada2_denoise_single(qiime2_reads, output_folder):
+    def qiime2_dada2_denoise_single(reads_qza, repseq_qza, table_qza, stats_qza):
         """
-        Denoise reads with DADA2
-        :param qiime2_reads: string. qiime2 qza file containing reads info
-        :param output_folder: string. Output folder
+        Denoise single-end reads with DADA2
+        :param reads_qza:
+        :param repseq_qza:
+        :param table_qza:
+        :param stats_qza:
         :return:
         """
         cmd = ['qiime', 'dada2', 'denoise-single',
                '--p-n-threads', str(0),
                '--p-trim-left', str(0),  # No trimming
                '--p-trunc-len', str(0),  # No trimming
-               '--i-demultiplexed-seqs', qiime2_reads,
-               '--o-representative-sequences', output_folder + '/rep-seqs.qza',
-               '--o-table', output_folder + '/table.qza',
-               '--o-denoising-stats', output_folder + '/stats.qza']
+               '--i-demultiplexed-seqs', reads_qza,
+               '--o-representative-sequences', repseq_qza,
+               '--o-table', table_qza,
+               '--o-denoising-stats', stats_qza]
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_metadata_tabulate(qiime2_stats, output_folder):
+    def qiime2_dada2_denoise_paired(reads_qza, repseq_qza, table_qza, stats_qza):
+        """
+        Denoise paired-end reads with DADA2
+        :param reads_qza:
+        :param repseq_qza:
+        :param table_qza:
+        :param stats_qza:
+        :return:
+        """
+        cmd = ['qiime', 'dada2', 'denoise-paired',
+               '--p-n-threads', str(0),
+               '--p-trim-left', str(0),  # No trimming
+               '--p-trunc-len', str(0),  # No trimming
+               '--i-demultiplexed-seqs', reads_qza,
+               '--o-representative-sequences', repseq_qza,
+               '--o-table', table_qza,
+               '--o-denoising-stats', stats_qza]
+        subprocess.run(cmd)
+
+    @staticmethod
+    def qiime2_metadata_tabulate(stats_qza, stats_qzv):
         """
 
-        :param qiime2_stats:
-        :param output_folder:
+        :param stats_qza:
+        :param stats_qzv:
         :return:
         """
         cmd = ['qiime', 'metadata', 'tabulate',
-               '--m-input-file',  qiime2_stats,
-               '--o-visualization',  output_folder + '/stats.qzv']
+               '--m-input-file',  stats_qza,
+               '--o-visualization',  stats_qzv]
         subprocess.run(cmd)
 
     @staticmethod
-    def eqiime2_export(input, output_folder):
+    def qiime2_export(qza, output_folder):
         """
         Export biom table
-        :param input: string. QIIME2 table
+        :param qza: string. QIIME2 table
         :param output_folder: sting. Output folder
         :return:
         """
         cmd = ['qiime', 'tools', 'export',
-               '--input-path',  input,
-               '--output-path',  output_folder + '/biom_table']  # this is a folder
+               '--input-path',  qza,
+               '--output-path', output_folder]  # this is a folder
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_sample_summary(metadata_file, qiime2_table, output_folder):
+    def qiime2_sample_summary(metadata_file, table_qza, table_qzv):
         """
 
         :param metadata_file:
-        :param qiime2_table:
-        :param output_folder:
+        :param table_qza:
+        :param table_qzv:
         :return:
         """
         cmd = ['qiime', 'feature-table', 'summarize',
                '--m-sample-metadata-file', metadata_file,
-               '--i-table', qiime2_table,
-               '--o-visualization',  output_folder + '/table.qzv']
+               '--i-table', table_qza,
+               '--o-visualization',  table_qzv]
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_seq_sumamry(qiime2_repseqs, output_folder):
+    def qiime2_seq_sumamry(repseqs_qza, repseqs_qzv):
         """
 
-        :param qiime2_repseqs:
-        :param output_folder:
+        :param repseqs_qza:
+        :param repseqs_qzv:
         :return:
         """
         cmd = ['qiime', 'feature-table', 'tabulate-seqs',
-               '--i-data', qiime2_repseqs,
-               '--o-visualization',  output_folder + '/rep-seqs.qzv']
+               '--i-data', repseqs_qza,
+               '--o-visualization',  repseqs_qzv]
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_phylogeny(qiime2_repseqs, output_folder):
+    def qiime2_phylogeny(repseqs_qza, align_repseqs_qza, masked_align_repseqs_qza, unrooted_tree_qza, rooted_tree_qza):
         """
 
-        :param qiime2_repseqs:
-        :param output_folder:
+        :param repseqs_qza:
+        :param align_repseqs_qza:
+        :param masked_align_repseqs_qza:
+        :param unrooted_tree_qza:
+        :param rooted_tree_qza:
         :return:
         """
         cmd = ['qiime', 'phylogeny', 'align-to-tree-mafft-fasttree',
                '--p-n-threads', 'auto',
-               '--i-sequences', qiime2_repseqs,
-               '--o-alignment', output_folder + '/aligned-rep-seqs.qza',
-               '--o-masked-alignment', output_folder + '/masked-aligned-rep-seqs.qza',
-               '--o-tree', output_folder + '/unrooted-tree.qza',
-               '--o-rooted-tree', output_folder + '/rooted-tree.qza']
+               '--i-sequences', repseqs_qza,
+               '--o-alignment', align_repseqs_qza,
+               '--o-masked-alignment', masked_align_repseqs_qza,
+               '--o-tree', unrooted_tree_qza,
+               '--o-rooted-tree', rooted_tree_qza]
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_core_diversity(cpu, metadata_file, qiime2_rooted_tree, qiime2_table, output_folder):
+    def qiime2_core_diversity(cpu, metadata_file, rooted_tree_qza, table_qza, output_folder):
         # Alpha and Beta analysis
         cmd = ['qiime', 'diversity', 'core-metrics-phylogenetic',
                '--p-n-jobs-or-threads', str(cpu),
                '--p-sampling-depth', str(1000),
-               '--i-phylogeny', qiime2_rooted_tree,
-               '--i-table', qiime2_table,
+               '--i-phylogeny', rooted_tree_qza,
+               '--i-table', table_qza,
                '--m-metadata-file', metadata_file,
                '--output-dir', output_folder + '/core-metrics-results']
 
     @staticmethod
-    def qiime2_rarefaction(metadata_file, qiime2_rooted_tree, qiime2_table, output_folder):
+    def qiime2_rarefaction(metadata_file, rooted_tree_qza, table_qza, rare_qzv):
         cmd = ['qiime', 'diversity', 'alpha-rarefaction',
                '--p-max-depth', str(4000),
-               '--i-phylogeny', qiime2_rooted_tree,
-               '--i-table', qiime2_table,
+               '--i-phylogeny', rooted_tree_qza,
+               '--i-table', table_qza,
                '--m-metadata-file', metadata_file,
-               '--o-visualization', output_folder + '/alpha-rarefaction.qzv']
+               '--o-visualization', rare_qzv]
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_classify(qiime2_classifier, qiime2_repseqs, output_folder): # Taxonomic analysis
+    def qiime2_classify(qiime2_classifier, repseqs_qza, taxonomy_qza):  # Taxonomic analysis
         cmd = ['qiime', 'feature-classifier', 'classify-sklearn',
                '--p-n-jobs', str(-1),
                '--i-classifier', qiime2_classifier,
-               '--i-reads', qiime2_repseqs,
-               '--o-classification',  output_folder + '/taxonomy.qza']
+               '--i-reads', repseqs_qza,
+               '--o-classification',  taxonomy_qza]
         subprocess.run(cmd)
 
     @staticmethod
-    def change_taxonomy_file_header(input_taxo, output_taxo):
-        with open(output_taxo, 'w') as out_f:
+    def change_taxonomy_file_header(input_taxo):
+        tmp = input_taxo + '.tmp'
+        with open(tmp, 'w') as out_f:
             out_f.write('#OTUID\ttaxonomy\tconfidence\n')  # write new header
             with open(input_taxo, 'r') as in_f:
                 next(in_f)  # skip header
                 for line in in_f:
                     out_f.write(line)  # dump rest of file
+        # overwrite original taxonomy file
+        os.replace(tmp, input_taxo)
 
     @staticmethod
     def biom_add_metadata(input_biom, taxonomy_tsv, output_biom):
@@ -240,10 +318,10 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_taxa_barplot(qiime2_table, qiime2_taxonomy, metadata_file, output_folder):
+    def qiime2_taxa_barplot(table_qza, taxonomy_qza, metadata_file, taxo_bar_plot_qzv):
         cmd = ['qiime', 'taxa', 'barplot',
-               '--i-table', qiime2_table,
-               '--i-taxonomy', qiime2_taxonomy,
+               '--i-table', table_qza,
+               '--i-taxonomy', taxonomy_qza,
                '--m-metadata-file', metadata_file,
                '--o-visualization', output_folder + '/taxa-bar-plots.qzv']
         subprocess.run(cmd)
