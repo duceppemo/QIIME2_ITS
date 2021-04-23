@@ -51,12 +51,12 @@ class RemoveEmpties(object):
                     if counter == 4:
                         seq_counter += 1
                         counter = 0
-                        if seq_list[1] == '':
-                            print('Sequence {} is empty'.format(seq_list[0]))
+                        if seq_list[1] == b'':
+                            # print('Sequence {} is empty'.format(seq_list[0].decode()))
                             seq_list = list()
                             empties_counter += 1
                         else:
-                            out_f.write('\n'.join(seq_list) + '\n')
+                            out_f.write(b'\n'.join(seq_list) + b'\n')
                             seq_list = list()
                             good_counter += 1
                 print('{}: total sequences: {}, good sequences: {}, empty sequences: {}'.format(

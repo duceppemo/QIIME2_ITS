@@ -37,7 +37,29 @@ class Qiime2Methods(object):
         return fastq_list
 
     @staticmethod
-    def extract_its(fastq_file, output_folder, cpu):
+    def rc_fastq(input_fastq, output_fastq):
+        """
+
+        :param input_fastq:
+        :param output_fastq:
+        :return:
+        """
+        cmd = ['reformat.sh',
+               'ow=t',
+               'rcomp=t',
+               'in={}'.format(input_fastq),
+               'out={}'.format(output_fastq)]
+        subprocess.run(cmd)
+
+    @staticmethod
+    def rc_fastq_parallel(fastq_list, output_folder, cpu):
+        with futures.ThreadPoolExecutor(max_workers=int(cpu / 4)) as executor:
+            args = ((fastq, output_folder, int(cpu / 4)) for fastq in fastq_list)
+            for results in executor.map(lambda p: Qiime2Methods.extract_its(*p), args):  # (*p) does the unpacking part
+                pass
+
+    @staticmethod
+    def extract_its(fastq_file, output_folder, log_folder, cpu):
         """
         Extract Fungi ITS1 sequence from fastq files. Use ITSxpress program.
         :param fastq_file: string. Fastq file path
@@ -53,12 +75,12 @@ class Qiime2Methods(object):
                '--taxa', 'Fungi',
                '--cluster_id', str(0.99),
                '--outfile', output_folder + '/' + os.path.basename(fastq_file),
-               '--log',  output_folder + '/log/' + os.path.basename(fastq_file).split('_')[0] + '.log',
+               '--log',  log_folder + '/' + os.path.basename(fastq_file).split('_')[0] + '.log',
                '--threads', str(cpu)]
         subprocess.run(cmd)
 
     @staticmethod
-    def extract_its_parallel(fastq_list, output_folder, cpu):
+    def extract_its_parallel(fastq_list, output_folder, log_folder, cpu):
         """
         Run "extract_its" in parallel using 4 cores per instance.
         :param fastq_list: string. A list of fastq file paths.
@@ -66,8 +88,8 @@ class Qiime2Methods(object):
         :param cpu: int. Number of cpu to use.
         :return:
         """
-        with futures.ThreadPoolExecutor(max_workers=cpu / 4) as executor:
-            args = ((fastq, output_folder, cpu / 4) for fastq in fastq_list)
+        with futures.ThreadPoolExecutor(max_workers=int(cpu / 4)) as executor:
+            args = ((fastq, output_folder, log_folder, int(cpu / 4)) for fastq in fastq_list)
             for results in executor.map(lambda p: Qiime2Methods.extract_its(*p), args):  # (*p) does the unpacking part
                 pass
 
@@ -81,6 +103,7 @@ class Qiime2Methods(object):
         cmd = ['python', 'remove_empty_fastq_entries.py',
                '-i', fastq_file]
         subprocess.run(cmd)
+        subprocess.run(cmd)
 
     @staticmethod
     def fix_fastq_parallel(fastq_list, cpu):
@@ -92,7 +115,7 @@ class Qiime2Methods(object):
         """
         with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
             args = (fastq for fastq in fastq_list)
-            for results in executor.map(Qiime2Methods.extract_its, args):
+            for results in executor.map(Qiime2Methods.fix_fastq, args):
                 pass
 
     @staticmethod
@@ -136,7 +159,7 @@ class Qiime2Methods(object):
         :param output_qzv:
         :return:
         """
-        cmd = ['qiime', 'demux', 'summary',
+        cmd = ['qiime', 'demux', 'summarize',
                '--p-n', str(1000),
                '--i-data', reads_qza,
                '--o-visualization', output_qzv]
@@ -209,7 +232,7 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_sample_summary(metadata_file, table_qza, table_qzv):
+    def qiime2_sample_summarize(metadata_file, table_qza, table_qzv):
         """
 
         :param metadata_file:
@@ -311,7 +334,7 @@ class Qiime2Methods(object):
     def biom_convert_taxo(input_biom_taxo, taxonomy_tsv, output_tsv_taxo):
         cmd = ['biom', 'convert',
                '--to-tsv',
-               '--header-key taxonomy',
+               '--header-key', 'taxonomy',
                '-i', input_biom_taxo,
                '--observation-metadata-fp', taxonomy_tsv,
                '-o', output_tsv_taxo]
@@ -323,5 +346,5 @@ class Qiime2Methods(object):
                '--i-table', table_qza,
                '--i-taxonomy', taxonomy_qza,
                '--m-metadata-file', metadata_file,
-               '--o-visualization', output_folder + '/taxa-bar-plots.qzv']
+               '--o-visualization', taxo_bar_plot_qzv]
         subprocess.run(cmd)

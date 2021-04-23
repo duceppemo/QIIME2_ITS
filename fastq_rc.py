@@ -5,7 +5,7 @@ import gzip
 from argparse import ArgumentParser
 from concurrent import futures
 from multiprocessing import cpu_count
-from qiime2_methodss import Qiime2Methods
+from qiime2_methods import Qiime2Methods
 
 
 class FastqRC(object):
