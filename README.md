@@ -1,8 +1,8 @@
 # IonTorrent_Fungi_Barcoding_QIIME2
-QIIME2 pipeline for IonTorrent sequencing data
+QIIME2 pipeline for single-end (IonTorrent) and paired-end (Illumina) sequencing data.
 
 ## Description
-This pipeline uses QIIME2 to process metagenomics data.
+This pipeline uses QIIME2 to process metagenomics data. Uses ITSxpress to extract ITS1 sequences and DADA2 for denoising. Only basic analysis is performed.
 
 ## Important
 Please make sure you are using a validated QIIME2 metadata tsv file. Use this tool to proceed with the validation step:
@@ -17,7 +17,7 @@ L2S357_15_L001_R1_001.fastq.gz. The underscore-separated fields in this file nam
   4. the direction of the read (i.e. only R1, because these are single-end reads), and
   5. the set number.
 ```
-If metadata file and fastq files are not properly formated, this pipeline will crash.
+If metadata file and fastq files are not properly formatted, this pipeline will crash.
 
 Please make sure that your samples are already demultiplexed, i.e. you have one fastq file per sample.
 

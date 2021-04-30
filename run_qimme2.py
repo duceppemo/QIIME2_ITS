@@ -60,10 +60,10 @@ class Qiime2(object):
         Qiime2Methods.make_folder(itsxpress_log_folder)
 
         # Extract Fungi ITS1 in parallel
-        # if self.single:
-        #     Qiime2Methods.extract_its_se_parallel(self.sample_dict, its_folder, itsxpress_log_folder, self.cpu)
-        # else:  # if self.paired:
-        #     Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder, self.cpu)
+        if self.single:
+            Qiime2Methods.extract_its_se_parallel(self.sample_dict, its_folder, itsxpress_log_folder, self.cpu)
+        else:  # if self.paired:
+            Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder, self.cpu)
 
         # Remove empty sequences. This is an artifact from ITSxpress.
         print('Checking for empty entries...')
