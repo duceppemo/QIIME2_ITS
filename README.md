@@ -1,6 +1,9 @@
 # IonTorrent_Fungi_Barcoding_QIIME2
 QIIME2 pipeline for IonTorrent sequencing data
 
+## Description
+This pipeline uses QIIME2 to process metagenomics data.
+
 ## Important
 Please make sure you are using a validated QIIME2 metadata tsv file. Use this tool to proceed with the validation step:
 https://keemei.qiime2.org/
@@ -42,7 +45,6 @@ cd IonTorrent_Fungi_Barcoding_QIIME2
 ```
 python run_qiime2.py -h
 ```
-
 ## Usage
 ```
 usage: run_qimme2.py [-h] -q qiime2-2020.8 -i /input_folder/ -o

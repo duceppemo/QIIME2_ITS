@@ -58,12 +58,21 @@ class Qiime2(object):
         itsxpress_log_folder = self.output_folder + '/itsxpress_log'
         Qiime2Methods.make_folder(its_folder)
         Qiime2Methods.make_folder(itsxpress_log_folder)
+
         # Extract Fungi ITS1 in parallel
-        Qiime2Methods.extract_its_parallel(self.fastq_list, its_folder, itsxpress_log_folder, self.cpu)
+        # if self.single:
+        #     Qiime2Methods.extract_its_se_parallel(self.sample_dict, its_folder, itsxpress_log_folder, self.cpu)
+        # else:  # if self.paired:
+        #     Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder, self.cpu)
+
         # Remove empty sequences. This is an artifact from ITSxpress.
         print('Checking for empty entries...')
         its_fastq_list = Qiime2Methods.list_fastq(its_folder)
-        Qiime2Methods.fix_fastq_parallel(its_fastq_list, self.cpu)
+        if self.single:
+            Qiime2Methods.fix_fastq_se_parallel(its_fastq_list, self.cpu)
+        else:
+            its_sample_dict = self.parse_fastq_list(its_fastq_list)
+            Qiime2Methods.fix_fastq_pe_parallel(its_sample_dict, self.cpu)
 
         # Run QIIME2
         print('Running QIIME2...')
@@ -167,14 +176,15 @@ class Qiime2(object):
     def parse_fastq_list(fastq_list):
         sample_dict = defaultdict(list)
         for fq in fastq_list:
-            sample = ''
-            if fq.endswith('.gz'):
-                sample = '.'.join(os.path.basename(fq).split('.')[:-2])
-            else:
-                sample = '.'.join(os.path.basename(fq).split('.')[:-1])
-            if 'R1' in sample.split('_')[3]:
+            sample = os.path.basename(fq).split('_')[0]
+            # sample = ''
+            # if fq.endswith('.gz'):
+            #     sample = '.'.join(os.path.basename(fq).split('.')[:-2])
+            # else:
+            #     sample = '.'.join(os.path.basename(fq).split('.')[:-1])
+            if 'R1' in os.path.basename(fq).split('_')[3]:
                 sample_dict[sample].insert(0, fq)
-            elif 'R2' in sample.split('_')[3]:
+            elif 'R2' in os.path.basename(fq).split('_')[3]:
                 sample_dict[sample].insert(1, fq)
 
         return sample_dict
