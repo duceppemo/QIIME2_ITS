@@ -1,4 +1,4 @@
-# IonTorrent_Fungi_Barcoding_QIIME2
+# QIIME2_ITS
 QIIME2 pipeline for single-end (IonTorrent) and paired-end (Illumina) sequencing data.
 
 ## Description
