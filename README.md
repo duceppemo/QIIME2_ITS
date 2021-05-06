@@ -21,6 +21,9 @@ If metadata file and fastq files are not properly formatted, this pipeline will 
 
 Please make sure that your samples are already demultiplexed, i.e. you have one fastq file per sample.
 
+Note that the DADA2 QIIME2 plugin is meant to process Illumina data. When running DADA2 in standalone mode, settings can be tweaked to compensate for IonTorrent errors (https://benjjneb.github.io/dada2/faq.html#can-i-use-dada2-with-my-454-or-ion-torrent-data), but those options are not available in the QIIME2 plugin. You may want to compare both to validate this pipeline for you applications.
+
+Lastly, I only had acces to limited data set to write this pipeline. It's quite possible that you may encounter problems running it. If that is the case, please let me know by reporting an issue.
 ## Installation
 
 1. Make sure you have conda installed. See https://docs.conda.io/en/latest/miniconda.html for `miniconda` installation instructions. You may prefer to install `anaconda`. `mamba` can also be installed afterward to speedup environment creation and package installation.
