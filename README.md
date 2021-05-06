@@ -38,11 +38,11 @@ conda install -c bioconda itsxpress
 ```
 5. Clone this repository (make sure `git` is installed in your environment. Use `conda install git` if needed):
 ```
-git clone https://github.com/duceppemo/IonTorrent_Fungi_Barcoding_QIIME2
+git clone https://github.com/duceppemo/QIIME2_ITS
 ```
 6. `cd` into cloned repository:
 ```
-cd IonTorrent_Fungi_Barcoding_QIIME2
+cd QIIME2_ITS
 ```
 7. Test pipeline:
 ```
