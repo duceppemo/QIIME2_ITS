@@ -23,7 +23,7 @@ Please make sure that your samples are already demultiplexed, i.e. you have one 
 
 Note that the DADA2 QIIME2 plugin is meant to process Illumina data. When running DADA2 in standalone mode, settings can be tweaked to compensate for IonTorrent errors (https://benjjneb.github.io/dada2/faq.html#can-i-use-dada2-with-my-454-or-ion-torrent-data), but those options are not available in the QIIME2 plugin. You may want to compare both to validate this pipeline for you applications.
 
-Lastly, I only had acces to limited data set to write this pipeline. It's quite possible that you may encounter problems running it. If that is the case, please let me know by reporting an issue.
+Lastly, I only had access to limited data sets to write this pipeline. It's quite possible that you may encounter problems running it. If that is the case, please let me know by reporting an issue.
 ## Installation
 
 1. Make sure you have conda installed. See https://docs.conda.io/en/latest/miniconda.html for `miniconda` installation instructions. You may prefer to install `anaconda`. `mamba` can also be installed afterward to speedup environment creation and package installation.
@@ -60,29 +60,32 @@ Run QIIME2 on IonTorrent sequencing data using the UNITE database
 optional arguments:
   -h, --help            show this help message and exit
   -q qiime2-2020.8, --qiime2 qiime2-2020.8
-                        Name of your QIIME2 conda environment.Mandatory.
+                        Name of your QIIME2 conda environment. Mandatory.
   -i /input_folder/, --input /input_folder/
-                        Input folder where the fastq reads are
-                        located.Mandatory.
+                        Input folder where the fastq reads are located.
+                        Mandatory.
   -o /output_folder/, --output /output_folder/
-                        Output folder for QIIME2 files.Mandatory.
+                        Output folder for QIIME2 files. Mandatory.
   -m qiime2_metadata.tsv, --metadata qiime2_metadata.tsv
-                        Validated QIIME2 metadata file (samples
-                        description).Mandatory.
+                        Validated QIIME2 metadata file (samples description).
+                        Mandatory.
   -c unite_classifier_qiime2.qza, --classifier unite_classifier_qiime2.qza
                         Classifier for QIIME2. See script
-                        "train_unite_classifier_qiime2.py" to compile
-                        it.Mandatory.
-  -t 16, --threads 16   Number of CPU. Default is 16
+                        "train_unite_classifier_qiime2.py" to compile it.
+                        Mandatory.
+  -t 16, --threads 16   Number of CPU. Default is 16. Optional
   -rc, --reverse_complement
                         Use this flag is your reads are in reverse complement.
                         For example if you sequenced from 5.8S to 18S.
+                        Optional.
   --min_len MIN_LEN     Minimum read length to keep. Default is 0 (no min
-                        length).
+                        length). Optional.
   --max_len MAX_LEN     Maximum read length to keep. Default is 0 (no max
-                        length).
-  -se                   Reads are single-end. One fastq file per sample.
-  -pe                   Reads are paired-end. Two fastq file per sample.
+                        length). Optional.
+  -se                   Reads are single-end. One fastq file per sample. "-se"
+                        or "-pe" mandatory.
+  -pe                   Reads are paired-end. Two fastq file per sample. "-se"
+                        or "-pe" mandatory.
 ```
 ## TODO
 - Implement min/max lengths

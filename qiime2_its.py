@@ -276,52 +276,57 @@ if __name__ == '__main__':
                         required=True,
                         type=str,
                         help='Name of your QIIME2 conda environment.'
-                             'Mandatory.')
+                             ' Mandatory.')
     parser.add_argument('-i', '--input', metavar='/input_folder/',
                         required=True,
                         type=str,
                         help='Input folder where the fastq reads are located.'
-                             'Mandatory.')
+                             ' Mandatory.')
     parser.add_argument('-o', '--output', metavar='/output_folder/',
                         required=True,
                         type=str,
                         help='Output folder for QIIME2 files.'
-                             'Mandatory.')
+                             ' Mandatory.')
     parser.add_argument('-m', '--metadata', metavar='qiime2_metadata.tsv',
                         required=True,
                         type=str,
                         help='Validated QIIME2 metadata file (samples description).'
-                             'Mandatory.')
+                             ' Mandatory.')
     parser.add_argument('-c', '--classifier', metavar='unite_classifier_qiime2.qza',
                         required=True,
                         type=str,
                         help='Classifier for QIIME2. See script "train_unite_classifier_qiime2.py" to compile it.'
-                             'Mandatory.')
+                             ' Mandatory.')
     parser.add_argument('-t', '--threads', metavar='{}'.format(cpu),
                         required=False, default=cpu,
                         type=int,
-                        help='Number of CPU. Default is {}'.format(cpu))
+                        help='Number of CPU. Default is {}. Optional'.format(cpu))
     parser.add_argument('-rc', '--reverse_complement',
                         action='store_true',  # 'store_true' means False by default
                         required=False,
                         help='Use this flag is your reads are in reverse complement. '
-                             'For example if you sequenced from 5.8S to 18S.')
+                             'For example if you sequenced from 5.8S to 18S.'
+                             ' Optional.')
     parser.add_argument('--min_len',
                         type=int, default=0,
                         required=False,
-                        help='Minimum read length to keep. Default is 0 (no min length).')
+                        help='Minimum read length to keep. Default is 0 (no min length).'
+                             ' Optional.')
     parser.add_argument('--max_len',
                         type=int, default=0,
                         required=False,
-                        help='Maximum read length to keep. Default is 0 (no max length).')
+                        help='Maximum read length to keep. Default is 0 (no max length).'
+                             ' Optional.')
     parser.add_argument('-se',
                         required=False,
                         action='store_true',
-                        help='Reads are single-end. One fastq file per sample.')
+                        help='Reads are single-end. One fastq file per sample.'
+                             ' "-se" or "-pe" mandatory.')
     parser.add_argument('-pe',
                         required=False,
                         action='store_true',
-                        help='Reads are paired-end. Two fastq file per sample.')
+                        help='Reads are paired-end. Two fastq file per sample.'
+                             ' "-se" or "-pe" mandatory.')
 
     # Get the arguments into an object
     arguments = parser.parse_args()
