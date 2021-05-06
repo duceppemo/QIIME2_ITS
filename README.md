@@ -12,7 +12,7 @@ QIIME2 also requires that the input fastq files to have a specific naming scheme
 ```
 L2S357_15_L001_R1_001.fastq.gz. The underscore-separated fields in this file name are:
   1. the sample identifier,
-  2. the barcode sequence or a barcode identifier,
+  2. the barcode sequence or a barcode identifier,.
   3. the lane number,
   4. the direction of the read (i.e. only R1, because these are single-end reads), and
   5. the set number.
@@ -46,7 +46,7 @@ cd IonTorrent_Fungi_Barcoding_QIIME2
 ```
 7. Test pipeline:
 ```
-python run_qiime2.py -h
+python3 qiime2_its.py -h
 ```
 ## Usage
 ```
