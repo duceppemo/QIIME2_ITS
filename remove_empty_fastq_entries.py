@@ -96,7 +96,7 @@ class RemoveEmpties(object):
                     seq_list = list()
 
         # Add r2 to dictionary
-        with gzip.open(r2, 'rb') if r1.endswith('gz') else open(r1, 'w') as in_f:
+        with gzip.open(r2, 'rb') if r2.endswith('gz') else open(r2, 'w') as in_f:
             seq_list = list()
             counter = 0
             seq_counter = 0
@@ -116,14 +116,14 @@ class RemoveEmpties(object):
             with gzip.open(out_r2, 'wb') as fh_r2:
                 empties_counter = 0
                 for read, reads_list in seq_dict.items():
-                    if seq_dict[read][0][1] == '' or seq_dict[read][1][1] == '':
+                    if seq_dict[read][0][1] == b'' or seq_dict[read][1][1] == b'':
                         empties_counter += 1
                         continue
                     else:
                         fh_r1.write(b'\n'.join(seq_dict[read][0]) + b'\n')
                         fh_r2.write(b'\n'.join(seq_dict[read][1]) + b'\n')
 
-                print('{}: total sequences: {}, good sequences: {}, empty sequences: {}'.format(
+                print('{}: input sequences: {}, good: {}, empty: {}'.format(
                     os.path.basename(r1).split('_')[0], len(seq_dict.keys()),
                     len(seq_dict.keys()) - empties_counter, empties_counter))
 

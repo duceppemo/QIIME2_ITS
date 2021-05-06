@@ -47,10 +47,10 @@ python run_qiime2.py -h
 ```
 ## Usage
 ```
-usage: run_qimme2.py [-h] -q qiime2-2020.8 -i /input_folder/ -o
-                     /output_folder/ -m qiime2_metadata.tsv -u
+usage: qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o
+                     /output_folder/ -m qiime2_metadata.tsv -c
                      unite_classifier_qiime2.qza [-t 16] [-rc]
-                     [--min_len MIN_LEN] [--max_len MAX_LEN]
+                     [--min_len MIN_LEN] [--max_len MAX_LEN] [-se] [-pe]
 
 Run QIIME2 on IonTorrent sequencing data using the UNITE database
 
@@ -66,8 +66,8 @@ optional arguments:
   -m qiime2_metadata.tsv, --metadata qiime2_metadata.tsv
                         Validated QIIME2 metadata file (samples
                         description).Mandatory.
-  -u unite_classifier_qiime2.qza, --unite unite_classifier_qiime2.qza
-                        UNITE classifier for QIIME2. See script
+  -c unite_classifier_qiime2.qza, --classifier unite_classifier_qiime2.qza
+                        Classifier for QIIME2. See script
                         "train_unite_classifier_qiime2.py" to compile
                         it.Mandatory.
   -t 16, --threads 16   Number of CPU. Default is 16
@@ -78,5 +78,8 @@ optional arguments:
                         length).
   --max_len MAX_LEN     Maximum read length to keep. Default is 0 (no max
                         length).
-
+  -se                   Reads are single-end. One fastq file per sample.
+  -pe                   Reads are paired-end. Two fastq file per sample.
 ```
+## TODO
+- Implement min/max lengths

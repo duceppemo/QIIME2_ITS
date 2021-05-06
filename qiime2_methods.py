@@ -178,12 +178,10 @@ class Qiime2Methods(object):
         :param cpu: int. number of CPU to use
         :return:
         """
-        for sample, fastq_list in sample_dict.items():
-            Qiime2Methods.fix_fastq_pe(fastq_list[0], fastq_list[1])
-        # with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
-        #     args = ((fastq_list[0], fastq_list[1]) for sample, fastq_list in sample_dict.items())
-        #     for results in executor.map(lambda p: Qiime2Methods.fix_fastq_pe(*p), args):  # (*p) unpacks arguments
-        #         pass
+        with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
+            args = ((fastq_list[0], fastq_list[1]) for sample, fastq_list in sample_dict.items())
+            for results in executor.map(lambda p: Qiime2Methods.fix_fastq_pe(*p), args):  # (*p) unpacks arguments
+                pass
 
     @staticmethod
     def qiime2_import_fastq_se(fastq_folder, reads_qza):
@@ -350,7 +348,15 @@ class Qiime2Methods(object):
 
     @staticmethod
     def qiime2_core_diversity(cpu, metadata_file, rooted_tree_qza, table_qza, output_folder):
-        # Alpha and Beta analysis
+        """
+        Alpha and Beta analysis
+        :param cpu:
+        :param metadata_file:
+        :param rooted_tree_qza:
+        :param table_qza:
+        :param output_folder:
+        :return:
+        """
         cmd = ['qiime', 'diversity', 'core-metrics-phylogenetic',
                '--p-n-jobs-or-threads', str(cpu),
                '--p-sampling-depth', str(1000),
@@ -361,6 +367,14 @@ class Qiime2Methods(object):
 
     @staticmethod
     def qiime2_rarefaction(metadata_file, rooted_tree_qza, table_qza, rare_qzv):
+        """
+
+        :param metadata_file:
+        :param rooted_tree_qza:
+        :param table_qza:
+        :param rare_qzv:
+        :return:
+        """
         cmd = ['qiime', 'diversity', 'alpha-rarefaction',
                '--p-max-depth', str(4000),
                '--i-phylogeny', rooted_tree_qza,
@@ -370,7 +384,14 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_classify(qiime2_classifier, repseqs_qza, taxonomy_qza):  # Taxonomic analysis
+    def qiime2_classify(qiime2_classifier, repseqs_qza, taxonomy_qza):
+        """
+        Taxonomic analysis
+        :param qiime2_classifier:
+        :param repseqs_qza:
+        :param taxonomy_qza:
+        :return:
+        """
         cmd = ['qiime', 'feature-classifier', 'classify-sklearn',
                '--p-n-jobs', str(-1),
                '--i-classifier', qiime2_classifier,
@@ -380,6 +401,11 @@ class Qiime2Methods(object):
 
     @staticmethod
     def change_taxonomy_file_header(input_taxo):
+        """
+
+        :param input_taxo:
+        :return:
+        """
         tmp = input_taxo + '.tmp'
         with open(tmp, 'w') as out_f:
             out_f.write('#OTUID\ttaxonomy\tconfidence\n')  # write new header
@@ -392,6 +418,13 @@ class Qiime2Methods(object):
 
     @staticmethod
     def biom_add_metadata(input_biom, taxonomy_tsv, output_biom):
+        """
+
+        :param input_biom:
+        :param taxonomy_tsv:
+        :param output_biom:
+        :return:
+        """
         cmd = ['biom', 'add-metadata',
                '--sc-separated', 'taxonomy',
                '-i', input_biom,
@@ -401,6 +434,13 @@ class Qiime2Methods(object):
 
     @staticmethod
     def biom_convert_taxo(input_biom_taxo, taxonomy_tsv, output_tsv_taxo):
+        """
+
+        :param input_biom_taxo:
+        :param taxonomy_tsv:
+        :param output_tsv_taxo:
+        :return:
+        """
         cmd = ['biom', 'convert',
                '--to-tsv',
                '--header-key', 'taxonomy',
@@ -411,6 +451,14 @@ class Qiime2Methods(object):
 
     @staticmethod
     def qiime2_taxa_barplot(table_qza, taxonomy_qza, metadata_file, taxo_bar_plot_qzv):
+        """
+
+        :param table_qza:
+        :param taxonomy_qza:
+        :param metadata_file:
+        :param taxo_bar_plot_qzv:
+        :return:
+        """
         cmd = ['qiime', 'taxa', 'barplot',
                '--i-table', table_qza,
                '--i-taxonomy', taxonomy_qza,
