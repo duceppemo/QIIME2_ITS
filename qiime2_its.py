@@ -121,6 +121,10 @@ class Qiime2(object):
                                        self.output_folder + '/unrooted-tree.qza',
                                        self.output_folder + '/rooted-tree.qza')
 
+        # Export phylogenetic tree
+        Qiime2Methods.qiime2_export(self.output_folder + '/unrooted-tree.qza',
+                                    self.output_folder)
+
         # Alpha and Beta diversity
         print('\tAnalysing Alpha and Beta diversity...')
         Qiime2Methods.qiime2_core_diversity(self.cpu,
