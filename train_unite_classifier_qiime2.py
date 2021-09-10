@@ -26,7 +26,7 @@ class Qiime2Trainer(object):
         self.checks()
         tmp_file = self.output_folder + '/tmp.tar.gz'
         print('Downloading UNITE databse')
-        # Qiime2Trainer.download(self.url, tmp_file)
+        Qiime2Trainer.download(self.url, tmp_file)
         (unite_seq, unite_taxo) = Qiime2Trainer.untargz(tmp_file)  # tuple
         unite_seq_fixed = '.'.join(unite_seq.split('.')[:-1]) + '_upper.fasta'
         print('Proofreading database...')
