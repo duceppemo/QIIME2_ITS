@@ -48,6 +48,16 @@ cd QIIME2_ITS
 ```
 python3 qiime2_its.py -h
 ```
+## Database
+In order to use this pipeline, you have to have a qiime2 classifier available. Here are the instruction to build the UNITE qiime2 classifier using the included helper script `train_unite_classifier_qiime2.py':
+```
+# QIIME files for unite are be located at https://unite.ut.ee/repository.php under the "QIIME release" drop down menu.
+python train_unite_classifier_qiime2.py \
+    -u https://files.plutof.ut.ee/public/orig/C5/54/C5547B97AAA979E45F79DC4C8C4B12113389343D7588716B5AD330F8BDB300C9.tgz \
+    -o '/db/UNITE' \
+    -q qiime2-2021.2
+```
+This script has only be tested for UNITE.
 ## Usage
 ```
 usage: qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o
