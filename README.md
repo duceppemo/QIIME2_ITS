@@ -27,32 +27,32 @@ Lastly, I only had access to limited data sets to write this pipeline. It's quit
 ## Installation
 
 1. Make sure you have conda installed. See https://docs.conda.io/en/latest/miniconda.html for `miniconda` installation instructions. You may prefer to install `anaconda`. `mamba` can also be installed afterward to speedup environment creation and package installation.
+
 2. Install `qiime2`. See https://docs.qiime2.org/2021.2/install/native/#install-qiime-2-within-a-conda-environment for instructions.
-3. Activate qiime2 conda environment.
+3. Run the following command lines:
 ```
+# Activate qiime2 conda environment
 conda activate qiime2-2021.2  # Version number may differ depending of time of installation.
-```
-4. Install ITSxpress
-```
+
+# Install ITSxpress
 conda install -c bioconda itsxpress
-```
-5. Clone this repository (make sure `git` is installed in your environment. Use `conda install git` if needed):
-```
+
+# Clone this repository (make sure `git` is installed in your environment. Use `conda install git` if needed):
 git clone https://github.com/duceppemo/QIIME2_ITS
-```
-6. `cd` into cloned repository:
-```
+
+# Go to cloned repository
 cd QIIME2_ITS
-```
-7. Test pipeline:
-```
-python3 qiime2_its.py -h
+
+# Test pipeline:
+python qiime2_its.py -h
 ```
 ## Database
 In order to use this pipeline, you have to have a qiime2 classifier available. Here are the instruction to build the UNITE qiime2 classifier using the included helper script `train_unite_classifier_qiime2.py':
 ```
 # QIIME files for unite are located at https://unite.ut.ee/repository.php under the "QIIME release" drop down menu.
 # Replace the url ("-u"), the datase location ("-o") and the qiime2 ("-q") to suit your installation.
+
+conda activate qiime2-2021.2  # If you didn't alread activated it
 
 python train_unite_classifier_qiime2.py \
     -u https://files.plutof.ut.ee/public/orig/C5/54/C5547B97AAA979E45F79DC4C8C4B12113389343D7588716B5AD330F8BDB300C9.tgz \
@@ -61,8 +61,8 @@ python train_unite_classifier_qiime2.py \
 ```
 This script has only be tested for UNITE.
 ## Usage
+Don't forget to activate your environment, if not already done.
 ```
-conda activate qiime2-2021.2  # If you didn't alread activated it
 usage: qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o
                      /output_folder/ -m qiime2_metadata.tsv -c
                      unite_classifier_qiime2.qza [-t 16] [-rc]
