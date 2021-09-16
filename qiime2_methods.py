@@ -53,8 +53,8 @@ class Qiime2Methods(object):
 
     @staticmethod
     def rc_fastq_parallel(fastq_list, output_folder, cpu):
-        with futures.ThreadPoolExecutor(max_workers=int(cpu / 4)) as executor:
-            args = ((fastq, output_folder, int(cpu / 4)) for fastq in fastq_list)
+        with futures.ThreadPoolExecutor(max_workers=4) as executor:
+            args = ((fastq, output_folder, int(cpu/4)) for fastq in fastq_list)
             for results in executor.map(lambda p: Qiime2Methods.extract_its_se(*p), args):  # (*p) does the unpacking part
                 pass
 
@@ -88,8 +88,8 @@ class Qiime2Methods(object):
         :param cpu: int. Number of cpu to use.
         :return:
         """
-        with futures.ThreadPoolExecutor(max_workers=int(cpu / 4)) as executor:
-            args = ((fastq, output_folder, log_folder, int(cpu / 4)) for fastq in fastq_list)
+        with futures.ThreadPoolExecutor(max_workers=4) as executor:
+            args = ((fastq, output_folder, log_folder, int(cpu/4)) for fastq in fastq_list)
             for results in executor.map(lambda p: Qiime2Methods.extract_its_se(*p), args):  # (*p) does the unpacking part
                 pass
 
@@ -126,8 +126,8 @@ class Qiime2Methods(object):
         :param cpu: int. Number of cpu to use.
         :return:
         """
-        with futures.ThreadPoolExecutor(max_workers=int(cpu / 4)) as executor:
-            args = ((fastq_list[0], fastq_list[1], output_folder, log_folder, int(cpu / 4))
+        with futures.ThreadPoolExecutor(max_workers=4) as executor:
+            args = ((fastq_list[0], fastq_list[1], output_folder, log_folder, int(cpu/4))
                     for sample, fastq_list in sample_dict.items())
             for results in executor.map(lambda p: Qiime2Methods.extract_its_pe(*p), args):  # (*p) unpacks arguments
                 pass
