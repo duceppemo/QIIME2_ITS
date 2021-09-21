@@ -52,10 +52,10 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def rc_fastq_parallel(fastq_list, output_folder, cpu):
-        with futures.ThreadPoolExecutor(max_workers=4) as executor:
-            args = ((fastq, output_folder, int(cpu/4)) for fastq in fastq_list)
-            for results in executor.map(lambda p: Qiime2Methods.extract_its_se(*p), args):  # (*p) does the unpacking part
+    def rc_fastq_parallel(fastq_list, output_folder, cpu, parallel):
+        with futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+            args = ((fastq, output_folder, int(cpu/parallel)) for fastq in fastq_list)
+            for results in executor.map(lambda p: Qiime2Methods.extract_its_se(*p), args):  # (*p) unpacks
                 pass
 
     @staticmethod
@@ -80,17 +80,18 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def extract_its_se_parallel(fastq_list, output_folder, log_folder, cpu):
+    def extract_its_se_parallel(fastq_list, output_folder, log_folder, cpu, parallel):
         """
         Run "extract_its" in parallel using 4 cores per instance.
         :param fastq_list: string. A list of fastq file paths.
         :param output_folder: sting. Path of output folder
         :param cpu: int. Number of cpu to use.
+        :param parallel: int. Number of samples to process in parallel
         :return:
         """
-        with futures.ThreadPoolExecutor(max_workers=4) as executor:
-            args = ((fastq, output_folder, log_folder, int(cpu/4)) for fastq in fastq_list)
-            for results in executor.map(lambda p: Qiime2Methods.extract_its_se(*p), args):  # (*p) does the unpacking part
+        with futures.ThreadPoolExecutor(max_workers=parallel) as executor:
+            args = ((fastq, output_folder, log_folder, int(cpu/parallel)) for fastq in fastq_list)
+            for results in executor.map(lambda p: Qiime2Methods.extract_its_se(*p), args):  # (*p) unpacks
                 pass
 
     @staticmethod
@@ -118,68 +119,73 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def extract_its_pe_parallel(sample_dict, output_folder, log_folder, cpu):
+    def extract_its_pe_parallel(sample_dict, output_folder, log_folder, cpu, parallel):
         """
         Run "extract_its" in parallel using 4 cores per instance.
         :param sample_dict: string. A dictionary of fastq file paths.
         :param output_folder: sting. Path of output folder
         :param cpu: int. Number of cpu to use.
+        :param parallel: int. Number of samples to process in parallel
         :return:
         """
-        with futures.ThreadPoolExecutor(max_workers=4) as executor:
-            args = ((fastq_list[0], fastq_list[1], output_folder, log_folder, int(cpu/4))
+        with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
+            args = ((fastq_list[0], fastq_list[1], output_folder, log_folder, int(cpu/parallel))
                     for sample, fastq_list in sample_dict.items())
             for results in executor.map(lambda p: Qiime2Methods.extract_its_pe(*p), args):  # (*p) unpacks arguments
                 pass
 
     @staticmethod
-    def fix_fastq_se(fastq_file):
+    def fix_fastq_se(install_path, fastq_file):
         """
         Remove empty entries from a fastq file. Overwrites the input file with the output file.
+        :param install_path: string. Path to install folder.
         :param fastq_file: string. Path of a fastq file, gzipped or not.
         :return:
         """
-        cmd = ['python', 'remove_empty_fastq_entries.py',
+        cmd = ['python', '{}/remove_empty_fastq_entries.py'.format(install_path),
                '-f', fastq_file]
         subprocess.run(cmd)
 
     @staticmethod
-    def fix_fastq_se_parallel(fastq_list, cpu):
+    def fix_fastq_se_parallel(install_path, fastq_list, cpu):
         """
         Run "fix_fastq" in parallel using all the threads, one file per thread
+        :param install_path: string. Path to install folder.
         :param fastq_list: string. list of fastq file paths
         :param cpu: int. number of CPU to use
         :return:
         """
         with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
-            args = (fastq for fastq in fastq_list)
-            for results in executor.map(Qiime2Methods.fix_fastq_se, args):
+            args = ((install_path, fastq) for fastq in fastq_list)
+            for results in executor.map(lambda p: Qiime2Methods.fix_fastq_se(*p), args):  # (*p) unpacks arguments
                 pass
 
     @staticmethod
-    def fix_fastq_pe(fastq_r1, fastq_r2):
+    def fix_fastq_pe(install_path, fastq_r1, fastq_r2):
         """
         Remove empty entries from a fastq file. Have to keep R1 and R2 synchronized.
         Overwrites the input file with the output file.
+        :param install_path: string. Path to install folder.
         :param fastq_r1: string. Path of a fastq R1 file, gzipped or not.
         :param fastq_r2: string. Path of a fastq R2 file, gzipped or not.
         :return:
         """
-        cmd = ['python', 'remove_empty_fastq_entries.py',
+        cmd = ['python', '{}/remove_empty_fastq_entries.py'.format(install_path),
                '-f', fastq_r1,
                '-f2', fastq_r2]
         subprocess.run(cmd)
 
     @staticmethod
-    def fix_fastq_pe_parallel(sample_dict, cpu):
+    def fix_fastq_pe_parallel(install_path, sample_dict, cpu):
         """
         Run "fix_fastq" in parallel using all the threads, one file per thread
+        :param install_path: string. Path to install folder.
         :param sample_dict: string. Dictionary of fastq file paths
         :param cpu: int. number of CPU to use
         :return:
         """
         with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
-            args = ((fastq_list[0], fastq_list[1]) for sample, fastq_list in sample_dict.items())
+            args = ((install_path, fastq_list[0], fastq_list[1]) for sample, fastq_list in sample_dict.items())
             for results in executor.map(lambda p: Qiime2Methods.fix_fastq_pe(*p), args):  # (*p) unpacks arguments
                 pass
 

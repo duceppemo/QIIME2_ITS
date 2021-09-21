@@ -11,24 +11,37 @@ from collections import defaultdict
 class Qiime2(object):
     def __init__(self, args):
         self.args = args
+
+        # Input
         self.input_folder = args.input
-        self.output_folder = args.output
-        self.qiime2_env = args.qiime2
-        self.cpu = args.threads
         self.qiime2_classifier = args.classifier
         self.metadata_file = args.metadata
-        self.revers_complement = args.reverse_complement
-        self.min_len = args.min_len
-        self.max_len = args.max_len
+
+        # Read type
         self.single = args.se
         self.paired = args.pe
 
-        # Data
-        # Create a list of all the fastq files in the input folder
-        self.fastq_list = list()
+        # Output
+        self.output_folder = args.output
 
-        # { sample: [read location])
-        self.sample_dict = dict
+        # Computing resources
+        self.cpu = args.threads
+        self.parallel = args.parallel_processes
+
+        # QIIME2 environment
+        self.qiime2_env = args.qiime2
+
+        # Options
+        self.revers_complement = args.reverse_complement
+        self.min_len = args.min_len
+        self.max_len = args.max_len
+
+        # Data
+        self.fastq_list = list()  # List of all the fastq files in the input folder
+        self.sample_dict = dict  # { sample: [read location])
+
+        # Install path
+        self.install_path = os.path.dirname(__file__)
 
         # Run
         self.run()
@@ -61,18 +74,20 @@ class Qiime2(object):
 
         # Extract Fungi ITS1 in parallel
         if self.single:
-            Qiime2Methods.extract_its_se_parallel(self.fastq_list, its_folder, itsxpress_log_folder, self.cpu)
+            Qiime2Methods.extract_its_se_parallel(self.fastq_list, its_folder, itsxpress_log_folder,
+                                                  self.cpu, self.parallel)
         else:  # if self.paired:
-            Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder, self.cpu)
+            Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder,
+                                                  self.cpu, self.parallel)
 
         # Remove empty sequences. This is an artifact from ITSxpress.
         print('Checking for empty entries...')
         its_fastq_list = Qiime2Methods.list_fastq(its_folder)
         if self.single:
-            Qiime2Methods.fix_fastq_se_parallel(its_fastq_list, self.cpu)
+            Qiime2Methods.fix_fastq_se_parallel(self.install_path, its_fastq_list, self.cpu)
         else:
             its_sample_dict = self.parse_fastq_list(its_fastq_list)
-            Qiime2Methods.fix_fastq_pe_parallel(its_sample_dict, self.cpu)
+            Qiime2Methods.fix_fastq_pe_parallel(self.install_path, its_sample_dict, self.cpu)
 
         # Run QIIME2
         print('Running QIIME2...')
@@ -176,6 +191,8 @@ class Qiime2(object):
                                           self.metadata_file,
                                           self.output_folder + '/taxa-bar-plots.qzv')
 
+        print('DONE!')
+
     @staticmethod
     def parse_fastq_list(fastq_list):
         sample_dict = defaultdict(list)
@@ -227,7 +244,6 @@ class Qiime2(object):
                          '\t5. the set number.']
 
         for f in self.fastq_list:
-            dir_name = os.path.dirname(f)
             base_name = os.path.basename(f)
             fields = base_name.split('.')[0].split('_')
 
@@ -240,7 +256,7 @@ class Qiime2(object):
                     raise Exception('\n'.join(error_message))
                 elif not fields[4] == '001':
                     raise Exception('\n'.join(error_message))
-        test = 1
+
         # Check metadata
         # Very basic check. Only checking that sample names are the same as fastq files
 
@@ -250,6 +266,13 @@ class Qiime2(object):
             pass
 
         # Check that input folder does not contain both read types (paired-end and single-end)
+
+        # Check cpu and parallel processes
+        cpu = cpu_count()
+        if 1 > self.cpu > cpu:  # smaller than 1 or greater than available cpu
+            self.cpu = cpu
+        if self.parallel > self.cpu:
+            self.parallel = self.cpu  # Will use only 1 cpu per parallel process
 
     @staticmethod
     def run_fastq_rc(input_folder, output_folder):
@@ -273,7 +296,6 @@ class Qiime2(object):
 
 
 if __name__ == '__main__':
-    cpu = cpu_count()
 
     parser = ArgumentParser(description='Run QIIME2 on IonTorrent sequencing data using the UNITE database')
     parser.add_argument('-q', '--qiime2', metavar='qiime2-2020.8',
@@ -301,10 +323,16 @@ if __name__ == '__main__':
                         type=str,
                         help='Classifier for QIIME2. See script "train_unite_classifier_qiime2.py" to compile it.'
                              ' Mandatory.')
-    parser.add_argument('-t', '--threads', metavar='{}'.format(cpu),
-                        required=False, default=cpu,
+    parser.add_argument('-t', '--threads', metavar='4',
+                        required=False, default=4,
                         type=int,
-                        help='Number of CPU. Default is {}. Optional'.format(cpu))
+                        help='Number of CPU. Default is 4.')
+    parser.add_argument('-p', '--parallel-processes', metavar='4',
+                        required=False, default=4,
+                        type=int,
+                        help='Processes to run in parallel. Adjust according the number of threads. '
+                             'For example, if 16 threads, using 4 parallel processes will run 4 samples in parallel '
+                             'using 4 threads each (16/4). Default is 4.')
     parser.add_argument('-rc', '--reverse_complement',
                         action='store_true',  # 'store_true' means False by default
                         required=False,
