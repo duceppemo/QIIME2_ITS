@@ -99,10 +99,10 @@ class Qiime2Trainer(object):
             for name in files:
                 file_path = os.path.join(root, name)
                 if ('developer' in file_path) and ('sh_refs_qiime' in file_path) \
-                        and ('_99_' in file_path) and ('.fasta'in file_path):
+                        and ('_99_' in file_path) and ('.fasta' in file_path):
                     seq_file = file_path
                 elif ('developer' in file_path) and ('sh_taxonomy_qiime' in file_path) \
-                        and ('_99_' in file_path) and ('.txt'in file_path):
+                        and ('_99_' in file_path) and ('.txt' in file_path):
                     taxo_file = file_path
         return seq_file, taxo_file
 
