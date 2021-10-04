@@ -34,8 +34,8 @@ Lastly, I only had access to limited data sets to write this pipeline. It's quit
 # Activate qiime2 conda environment
 conda activate qiime2-2021.2  # Version number may differ depending of time of installation.
 
-# Install ITSxpress
-conda install -c bioconda itsxpress
+# Install ITSxpress and NCBI's entrez
+conda install -c bioconda itsxpress entrez-direct
 
 # Clone this repository (make sure `git` is installed in your environment. Use `conda install git` if needed):
 git clone https://github.com/duceppemo/QIIME2_ITS
@@ -47,7 +47,9 @@ cd QIIME2_ITS
 python qiime2_its.py -h
 ```
 ## Database
-In order to use this pipeline, you have to have a qiime2 classifier available. Here are the instruction to build the UNITE qiime2 classifier using the included helper script `train_unite_classifier_qiime2.py':
+In order to use this pipeline, you have to have a qiime2 classifier available.
+
+Here are the instruction to build the UNITE qiime2 classifier using the included helper script `train_unite_classifier_qiime2.py`:
 ```
 # QIIME files for unite are located at https://unite.ut.ee/repository.php under the "QIIME release" drop down menu.
 # Replace the url ("-u"), the datase location ("-o") and the qiime2 ("-q") to suit your installation.
@@ -59,7 +61,16 @@ python train_unite_classifier_qiime2.py \
     -o '/db/UNITE' \
     -q qiime2-2021.2
 ```
-This script has only be tested for UNITE.
+
+Here's how to build a classifier from sequences downloaded from genbank with the script `train_ncbi_classifier_qiime2.py`. That script takes care of downloading the sequences, the taxonomy and train the QIIME2 classifier. It takes as input a NCBI query input. It is strongly recommended testing your query string on NCBI's website first to make sure you get the right sequences:
+```
+python train_ncbi_classifier_qiime2.py \
+    -q "txid4762[Organism:exp] AND (\"internal transcribed spacer\"[Title]) NOT uncultured[Title]" \
+    -t 48 \
+    -o /oomycetes_DB \
+    -e your_email@probider.org \
+    -a ncbiapikeyisoptionalebutrecommended0
+```
 ## Usage
 Don't forget to activate your environment, if not already done.
 ```

@@ -2,7 +2,6 @@
 
 import os
 import subprocess
-import pathlib
 import shutil
 import urllib.request
 import tarfile
