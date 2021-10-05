@@ -164,21 +164,6 @@ class Methods(object):
 
         return acc2taxid_dict
 
-    # @staticmethod
-    # def replace_merged_taxid(acc2taxid_dict, merged_file):
-    #     # Parse meged.dmp
-    #     with open(merged_file, 'r') as f:
-    #         for line in f:
-    #             fields = line.split('\t')
-    #             old_taxid = fields[0]
-    #             new_taxid = fields[2]
-    #             if old_taxid in acc2taxid_dict.values():
-    #                 # Find the key
-    #                 acc = list(acc2taxid_dict.keys())[list(acc2taxid_dict.values()).index(old_taxid)]
-    #
-    #                 # Replace the value
-    #                 acc2taxid_dict[acc] = new_taxid
-
     @staticmethod
     def acc_to_taxid(acc_dict, acc2taxid_dict, output_file):
         # Parse acc2taxid gzippped file
@@ -340,75 +325,66 @@ class DbBuilder(object):
         # Check a few things before starting processing data
         self.checks()
 
-        # # Download and extract taxdump
-        # print('Downloading taxdump.tar.gz... ', end="", flush=True)
-        # start_time = time()
-        # Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
-        # Methods.untargz(self.output_folder + '/taxdump.tar.gz')
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
-        #
-        # # Download nucleotide accession2taxid
-        # print('Downloading accession2taxid.gz... ', end="", flush=True)
-        # start_time = time()
-        # Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
+        # Download and extract taxdump
+        print('Downloading taxdump.tar.gz... ', end="", flush=True)
+        start_time = time()
+        Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
+        Methods.untargz(self.output_folder + '/taxdump.tar.gz')
+        end_time = time()
+        interval = end_time - start_time
+        print(" took %s" % Methods.elapsed_time(interval))
 
-        # # Download dead nucleotide accession2taxid
-        # print('Downloading dead_nucl.accession2taxid.gz... ', end="", flush=True)
-        # start_time = time()
-        # Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
+        # Download nucleotide accession2taxid
+        print('Downloading accession2taxid.gz... ', end="", flush=True)
+        start_time = time()
+        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
+        end_time = time()
+        interval = end_time - start_time
+        print(" took %s" % Methods.elapsed_time(interval))
+
+        # Download dead nucleotide accession2taxid
+        print('Downloading dead_nucl.accession2taxid.gz... ', end="", flush=True)
+        start_time = time()
+        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
+        end_time = time()
+        interval = end_time - start_time
+        print(" took %s" % Methods.elapsed_time(interval))
 
         # Download nucleotide sequences of the query result
         seq_file = self.output_folder + '/seq.fasta'
-        # Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
+        Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
 
-        # # Extract accession numbers from downloaded fasta sequences
-        # print('Extracting accession numbers from fasta file...', end="", flush=True)
-        # start_time = time()
-        # acc_file = self.output_folder + '/acc.list'
-        # acc_dict = Methods.extract_acc_from_fasta(seq_file, acc_file)
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
-        #
-        # print('Parsing nucl_gb.accession2taxid.gz... ', end="", flush=True)
-        # start_time = time()
-        # acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz')
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
-        #
-        # print('Parsing dead_nucl_gb.accession2taxid.gz... ', end="", flush=True)
-        # start_time = time()
-        # acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz'))
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
+        # Extract accession numbers from downloaded fasta sequences
+        print('Extracting accession numbers from fasta file...', end="", flush=True)
+        start_time = time()
+        acc_file = self.output_folder + '/acc.list'
+        acc_dict = Methods.extract_acc_from_fasta(seq_file, acc_file)
+        end_time = time()
+        interval = end_time - start_time
+        print(" took %s" % Methods.elapsed_time(interval))
 
-        # # Replace merged taxid
-        # print('Looking for merged taxids...', end="", flush=True)
-        # start_time = time()
-        # merged_file = self.output_folder + '/merged.dmp'
-        # Methods.replace_merged_taxid(acc2taxid_dict, merged_file)
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
+        print('Parsing nucl_gb.accession2taxid.gz... ', end="", flush=True)
+        start_time = time()
+        acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz')
+        end_time = time()
+        interval = end_time - start_time
+        print(" took %s" % Methods.elapsed_time(interval))
 
-        # # Find taxid for acc
-        # print('Finding taxID for accessions... ', end="", flush=True)
-        # start_time = time()
+        print('Parsing dead_nucl_gb.accession2taxid.gz... ', end="", flush=True)
+        start_time = time()
+        acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz'))
+        end_time = time()
+        interval = end_time - start_time
+        print(" took %s" % Methods.elapsed_time(interval))
+
+        # Find taxid for acc
+        print('Finding taxID for accessions... ', end="", flush=True)
+        start_time = time()
         taxid_file = self.output_folder + '/taxid.list'
-        # Methods.acc_to_taxid(acc_dict, acc2taxid_dict, taxid_file)
-        # end_time = time()
-        # interval = end_time - start_time
-        # print(" took %s" % Methods.elapsed_time(interval))
+        Methods.acc_to_taxid(acc_dict, acc2taxid_dict, taxid_file)
+        end_time = time()
+        interval = end_time - start_time
+        print(" took %s" % Methods.elapsed_time(interval))
 
         # Expand taxonomy from taxid
         print('Writting taxonomy...', end="", flush=True)
