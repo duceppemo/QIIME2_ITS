@@ -59,7 +59,7 @@ class Qiime2Methods(object):
                 pass
 
     @staticmethod
-    def extract_its_se(fastq_file, output_folder, log_folder, cpu):
+    def extract_its_se(fastq_file, output_folder, log_folder, cpu, taxa, region):
         """
         Extract Fungi ITS1 sequence from fastq files. Use ITSxpress program.
         :param fastq_file: string. Fastq file path
@@ -71,8 +71,8 @@ class Qiime2Methods(object):
                '--threads', str(cpu),
                '--single_end',
                '--fastq', fastq_file,
-               '--region', 'ITS1',
-               '--taxa', 'Fungi',
+               '--region', region,
+               '--taxa', taxa,
                '--cluster_id', str(0.99),
                '--outfile', output_folder + '/' + os.path.basename(fastq_file),
                '--log',  log_folder + '/' + os.path.basename(fastq_file).split('_')[0] + '.log',
@@ -80,7 +80,7 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def extract_its_se_parallel(fastq_list, output_folder, log_folder, cpu, parallel):
+    def extract_its_se_parallel(fastq_list, output_folder, log_folder, cpu, parallel, taxa, region):
         """
         Run "extract_its" in parallel using 4 cores per instance.
         :param fastq_list: string. A list of fastq file paths.
@@ -90,12 +90,12 @@ class Qiime2Methods(object):
         :return:
         """
         with futures.ThreadPoolExecutor(max_workers=parallel) as executor:
-            args = ((fastq, output_folder, log_folder, int(cpu/parallel)) for fastq in fastq_list)
+            args = ((fastq, output_folder, log_folder, int(cpu/parallel), taxa, region) for fastq in fastq_list)
             for results in executor.map(lambda p: Qiime2Methods.extract_its_se(*p), args):  # (*p) unpacks
                 pass
 
     @staticmethod
-    def extract_its_pe(fastq_r1, fastq_r2, output_folder, log_folder, cpu):
+    def extract_its_pe(fastq_r1, fastq_r2, output_folder, log_folder, cpu, taxa, region):
         """
         Extract Fungi ITS1 sequence from fastq files. Use ITSxpress program.
         :param fastq_r1: string. Fastq file path
@@ -109,8 +109,8 @@ class Qiime2Methods(object):
                '--threads', str(cpu),
                '--fastq', fastq_r1,
                '--fastq2', fastq_r2,
-               '--region', 'ITS1',
-               '--taxa', 'Fungi',
+               '--region', region,
+               '--taxa', taxa,
                '--cluster_id', str(0.99),
                '--outfile', output_folder + '/' + os.path.basename(fastq_r1),
                '--outfile2', output_folder + '/' + os.path.basename(fastq_r2),
@@ -119,7 +119,7 @@ class Qiime2Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def extract_its_pe_parallel(sample_dict, output_folder, log_folder, cpu, parallel):
+    def extract_its_pe_parallel(sample_dict, output_folder, log_folder, cpu, parallel, taxa, region):
         """
         Run "extract_its" in parallel using 4 cores per instance.
         :param sample_dict: string. A dictionary of fastq file paths.
@@ -129,7 +129,7 @@ class Qiime2Methods(object):
         :return:
         """
         with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
-            args = ((fastq_list[0], fastq_list[1], output_folder, log_folder, int(cpu/parallel))
+            args = ((fastq_list[0], fastq_list[1], output_folder, log_folder, int(cpu/parallel), taxa, region)
                     for sample, fastq_list in sample_dict.items())
             for results in executor.map(lambda p: Qiime2Methods.extract_its_pe(*p), args):  # (*p) unpacks arguments
                 pass

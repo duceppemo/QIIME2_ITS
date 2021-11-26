@@ -5,6 +5,7 @@ from multiprocessing import cpu_count
 from time import time
 
 import shutil
+from itertools import islice
 from urllib.request import urlopen
 from pathlib import Path
 import os
@@ -15,6 +16,14 @@ from time import sleep
 import gzip
 import numpy as np
 import subprocess
+import multiprocessing as mp
+
+
+# TODO: add download progressbar
+#  (https://stackoverflow.com/questions/41106599/python-3-5-urllib-request-urlopen-progress-bar-available)
+# TODO: check if taxonomy download files are already present and skip download
+# TODO: resume failed taxonomy file download and/or try many times
+# TODO: Parallel parse taxonomy files
 
 
 class Methods(object):
@@ -164,12 +173,58 @@ class Methods(object):
 
         return acc2taxid_dict
 
+    # @staticmethod
+    # def parse_acc2taxid_chunk(chunk):
+    #     acc2taxid_dict = dict()
+    #     for line in chunk:
+    #         field_list = line.decode().split('\t')
+    #         acc = field_list[0]
+    #         taxid = field_list[2]
+    #         acc2taxid_dict[acc] = taxid
+    #
+    #     return acc2taxid_dict
+    #
+    # @staticmethod
+    # def make_chunks(file_handle, size):
+    #     file_handle.readline()  # skip first line (header)
+    #     while True:
+    #         chunk = list(islice(file_handle, size))
+    #         if not chunk:
+    #             break
+    #         yield chunk
+    #
+    # @staticmethod
+    # def parse_acc2taxid_file_parallel(acc2taxid, cpu):
+    #     # Chunk taxonomy file and run chunks in parallel
+    #     acc2taxid_dict = dict()
+    #     with gzip.open(acc2taxid, 'rb') as f:
+    #         pool = mp.Pool(cpu)
+    #         jobs = [pool.apply_async(Methods.parse_acc2taxid_chunk, args=(chunk,))
+    #                 for chunk in Methods.make_chunks(f, 1000000)]
+    #         results = [j.get() for j in jobs]
+    #         pool.close()
+    #         pool.join()
+    #         pool.terminate()  # Needed to do proper garbage collection?
+    #
+    #         # Update self.sample_dict with results from every chunk
+    #         for d in results:
+    #             acc2taxid_dict.update(d)  # Do the merge
+    #
+    #     return acc2taxid_dict
+
     @staticmethod
     def acc_to_taxid(acc_dict, acc2taxid_dict, output_file):
-        # Parse acc2taxid gzippped file
+        # Parse acc2taxid gzipped file
+        missing_acc2taxid = list()
         with open(output_file, 'w') as f:
             for acc, x in acc_dict.items():
-                f.write('{}\t{}\n'.format(acc, acc2taxid_dict[acc.split('.')[0]]))
+                try:
+                    f.write('{}\t{}\n'.format(acc, acc2taxid_dict[acc.split('.')[0]]))
+                except KeyError as e:
+                    # print('The following accession was not found in the taxdump files: {}'.format(e))
+                    missing_acc2taxid.append(e.args[0])
+                    f.write('{}\t{}\n'.format(acc, '12908'))  # unclassified sequence
+        print('The following accession was not found in the taxdump files: {}'.format(', '.join(missing_acc2taxid)))
 
     @staticmethod
     def expand_taxonomy_from_taxid(taxid_file, taxonomy_file, nodes_file, names_file, merged_file):
@@ -328,7 +383,7 @@ class DbBuilder(object):
         # Download and extract taxdump
         print('Downloading taxdump.tar.gz... ', end="", flush=True)
         start_time = time()
-        Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
+        # Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
         Methods.untargz(self.output_folder + '/taxdump.tar.gz')
         end_time = time()
         interval = end_time - start_time
@@ -337,7 +392,7 @@ class DbBuilder(object):
         # Download nucleotide accession2taxid
         print('Downloading accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
+        # Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
@@ -345,14 +400,14 @@ class DbBuilder(object):
         # Download dead nucleotide accession2taxid
         print('Downloading dead_nucl.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
+        # Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
 
         # Download nucleotide sequences of the query result
         seq_file = self.output_folder + '/seq.fasta'
-        Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
+        # Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
 
         # Extract accession numbers from downloaded fasta sequences
         print('Extracting accession numbers from fasta file...', end="", flush=True)
@@ -366,6 +421,7 @@ class DbBuilder(object):
         print('Parsing nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
         acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz')
+        # acc2taxid_dict = Methods.parse_acc2taxid_file_parallel(self.output_folder + '/nucl_gb.accession2taxid.gz', self.cpu)
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
@@ -373,6 +429,7 @@ class DbBuilder(object):
         print('Parsing dead_nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
         acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz'))
+        # acc2taxid_dict.update(Methods.parse_acc2taxid_file_parallel(self.output_folder + '/dead_nucl.accession2taxid.gz', self.cpu))
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
@@ -434,7 +491,7 @@ class DbBuilder(object):
 if __name__ == '__main__':
 
     parser = ArgumentParser(description='Download DNA sequence from NCBI and add taxonomy for QIIME2.')
-    parser.add_argument('-q', '--query', metavar='\'txid4762[Organism:exp] AND ("internal transcribed spacer"[Title]) NOT uncultured[Title]\'',
+    parser.add_argument('-q', '--query', metavar='\"txid4762[Organism:exp] AND (\"internal transcribed spacer\"[Title]) NOT uncultured[Title]\"',
                         required=True,
                         type=str,
                         help='NCBI query string.'

@@ -8,6 +8,9 @@ from qiime2_methods import Qiime2Methods
 from collections import defaultdict
 
 
+# TODO: add an option to select taxa for ITSxpress
+
+
 class Qiime2(object):
     def __init__(self, args):
         self.args = args
@@ -36,6 +39,15 @@ class Qiime2(object):
         self.min_len = args.min_len
         self.max_len = args.max_len
 
+        # ITS
+        self.its1 = args.extract_its1
+        self.its2 = args.extract_its2
+        self.taxa = args.taxa
+        if self.its1:
+            self.region = 'ITS1'
+        elif self.its2:
+            self.region = 'ITS2'
+
         # Data
         self.fastq_list = list()  # List of all the fastq files in the input folder
         self.sample_dict = dict  # { sample: [read location])
@@ -56,38 +68,41 @@ class Qiime2(object):
         # Parse samples and their locations in a dictionary
         self.sample_dict = self.parse_fastq_list(self.fastq_list)
 
-        # Check for reverse complement flag
-        if self.revers_complement:
-            print('Reverse complementing reads...')
-            rc_folder = self.output_folder + '/rc_reads'
-            Qiime2Methods.make_folder(rc_folder)
-            Qiime2.run_fastq_rc(self.input_folder, rc_folder)
-            # Update fastq list abd input folder
-            self.fastq_list = Qiime2Methods.list_fastq(rc_folder)
+        if self.its1 or self.its2:  # Extracting ITS region from reads
+            # Check for reverse complement flag
+            if self.revers_complement:
+                print('Reverse complementing reads...')
+                rc_folder = self.output_folder + '/rc_reads'
+                Qiime2Methods.make_folder(rc_folder)
+                Qiime2.run_fastq_rc(self.input_folder, rc_folder)
+                # Update fastq list abd input folder
+                self.fastq_list = Qiime2Methods.list_fastq(rc_folder)
 
-        # Create ITSxpress output folder and log folder
-        print('Extracting ITS...')
-        its_folder = self.output_folder + '/ITSxpress'
-        itsxpress_log_folder = self.output_folder + '/itsxpress_log'
-        Qiime2Methods.make_folder(its_folder)
-        Qiime2Methods.make_folder(itsxpress_log_folder)
+            # Create ITSxpress output folder and log folder
+            print('Extracting ITS...')
+            its_folder = self.output_folder + '/ITSxpress'
+            itsxpress_log_folder = self.output_folder + '/itsxpress_log'
+            Qiime2Methods.make_folder(its_folder)
+            Qiime2Methods.make_folder(itsxpress_log_folder)
 
-        # Extract Fungi ITS1 in parallel
-        if self.single:
-            Qiime2Methods.extract_its_se_parallel(self.fastq_list, its_folder, itsxpress_log_folder,
-                                                  self.cpu, self.parallel)
-        else:  # if self.paired:
-            Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder,
-                                                  self.cpu, self.parallel)
+            # Extract Fungi ITS1 in parallel
+            if self.single:
+                Qiime2Methods.extract_its_se_parallel(self.fastq_list, its_folder, itsxpress_log_folder,
+                                                      self.cpu, self.parallel, self.taxa, self.region)
+            else:  # if self.paired:
+                Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder,
+                                                      self.cpu, self.parallel, self.taxa, self.region)
 
-        # Remove empty sequences. This is an artifact from ITSxpress.
-        print('Checking for empty entries...')
-        its_fastq_list = Qiime2Methods.list_fastq(its_folder)
-        if self.single:
-            Qiime2Methods.fix_fastq_se_parallel(self.install_path, its_fastq_list, self.cpu)
-        else:
-            its_sample_dict = self.parse_fastq_list(its_fastq_list)
-            Qiime2Methods.fix_fastq_pe_parallel(self.install_path, its_sample_dict, self.cpu)
+            # Remove empty sequences. This is an artifact from ITSxpress.
+            print('Checking for empty entries...')
+            its_fastq_list = Qiime2Methods.list_fastq(its_folder)
+            if self.single:
+                Qiime2Methods.fix_fastq_se_parallel(self.install_path, its_fastq_list, self.cpu)
+            else:
+                its_sample_dict = self.parse_fastq_list(its_fastq_list)
+                Qiime2Methods.fix_fastq_pe_parallel(self.install_path, its_sample_dict, self.cpu)
+        else:  # Not extracting ITS from reads
+            its_folder = self.input_folder
 
         # Run QIIME2
         print('Running QIIME2...')
@@ -274,6 +289,10 @@ class Qiime2(object):
         if self.parallel > self.cpu:
             self.parallel = self.cpu  # Will use only 1 cpu per parallel process
 
+        # Check extract-its flag
+        if self.its1 and self.its2:
+            raise Exception('You cannot choose both ITS1 and ITS2 during the same analysis.')
+
     @staticmethod
     def run_fastq_rc(input_folder, output_folder):
         cmd = ['python3', 'fastq_rc.py',
@@ -359,6 +378,20 @@ if __name__ == '__main__':
                         action='store_true',
                         help='Reads are paired-end. Two fastq file per sample.'
                              ' "-se" or "-pe" mandatory.')
+    parser.add_argument('--extract-its1',
+                        required=False,
+                        action='store_true',
+                        help='Extract ITS1 sequence from reads with ITSxpress. Cannot be used with "--extract-its2".')
+    parser.add_argument('--extract-its2',
+                        required=False,
+                        action='store_true',
+                        help='Extract ITS2 sequence from reads with ITSxpress. Cannot be used with "--extract-its1".')
+    parser.add_argument('--taxa', metavar='Fungi',
+                        required=False, default='Fungi',
+                        type=str,
+                        help='Select taxa of interest for ITSxpress: {Alveolata,Bryophyta,Bacillariophyta,Amoebozoa,'
+                             'Euglenozoa,Fungi,Chlorophyta,Rhodophyta,Phaeophyceae,Marchantiophyta,Metazoa,Oomycota,'
+                             'Haptophyceae,Raphidophyceae, Rhizaria,Synurophyceae,Tracheophyta,Eustigmatophyceae,All}')
 
     # Get the arguments into an object
     arguments = parser.parse_args()
