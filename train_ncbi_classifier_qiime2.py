@@ -421,7 +421,7 @@ class DbBuilder(object):
         print('Parsing nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
         acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz')
-        acc2taxid_dict = Methods.parse_acc2taxid_file_parallel(self.output_folder + '/nucl_gb.accession2taxid.gz', self.cpu)
+        # acc2taxid_dict = Methods.parse_acc2taxid_file_parallel(self.output_folder + '/nucl_gb.accession2taxid.gz', self.cpu)  # slower
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
@@ -429,7 +429,7 @@ class DbBuilder(object):
         print('Parsing dead_nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
         acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz'))
-        acc2taxid_dict.update(Methods.parse_acc2taxid_file_parallel(self.output_folder + '/dead_nucl.accession2taxid.gz', self.cpu))
+        # acc2taxid_dict.update(Methods.parse_acc2taxid_file_parallel(self.output_folder + '/dead_nucl.accession2taxid.gz', self.cpu))  # slower
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
