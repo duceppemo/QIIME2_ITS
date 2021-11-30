@@ -383,7 +383,7 @@ class DbBuilder(object):
         # Download and extract taxdump
         print('Downloading taxdump.tar.gz... ', end="", flush=True)
         start_time = time()
-        # Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
+        Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
         Methods.untargz(self.output_folder + '/taxdump.tar.gz')
         end_time = time()
         interval = end_time - start_time
@@ -392,7 +392,7 @@ class DbBuilder(object):
         # Download nucleotide accession2taxid
         print('Downloading accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        # Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
+        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
@@ -400,14 +400,14 @@ class DbBuilder(object):
         # Download dead nucleotide accession2taxid
         print('Downloading dead_nucl.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        # Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
+        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
 
         # Download nucleotide sequences of the query result
         seq_file = self.output_folder + '/seq.fasta'
-        # Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
+        Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
 
         # Extract accession numbers from downloaded fasta sequences
         print('Extracting accession numbers from fasta file...', end="", flush=True)
@@ -421,7 +421,7 @@ class DbBuilder(object):
         print('Parsing nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
         acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz')
-        # acc2taxid_dict = Methods.parse_acc2taxid_file_parallel(self.output_folder + '/nucl_gb.accession2taxid.gz', self.cpu)
+        acc2taxid_dict = Methods.parse_acc2taxid_file_parallel(self.output_folder + '/nucl_gb.accession2taxid.gz', self.cpu)
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
@@ -429,7 +429,7 @@ class DbBuilder(object):
         print('Parsing dead_nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
         acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz'))
-        # acc2taxid_dict.update(Methods.parse_acc2taxid_file_parallel(self.output_folder + '/dead_nucl.accession2taxid.gz', self.cpu))
+        acc2taxid_dict.update(Methods.parse_acc2taxid_file_parallel(self.output_folder + '/dead_nucl.accession2taxid.gz', self.cpu))
         end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
