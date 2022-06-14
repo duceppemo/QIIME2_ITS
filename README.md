@@ -8,14 +8,15 @@ This pipeline uses QIIME2 to process metagenomics data. Uses ITSxpress to extrac
 Please make sure you are using a validated QIIME2 metadata tsv file. Use this tool to proceed with the validation step:
 https://keemei.qiime2.org/
 
-QIIME2 also requires that the input fastq files to have a specific naming scheme, used by Illimina sequencers. Valid QIIME fastq files names are structure like this:
+QIIME2 also requires that the input fastq files to have a specific naming scheme, used by Illumina sequencers. Valid QIIME fastq files names are structure like this:
 ```
-L2S357_15_L001_R1_001.fastq.gz. The underscore-separated fields in this file name are:
+'.+_.+_L[0-9][0-9][0-9]_R[12]_001\\.fastq\\.gz'
+An example would be "L2S357_15_L001_R1_001.fastq.gz". The underscore-separated fields in this file name are:
   1. the sample identifier,
   2. the barcode sequence or a barcode identifier,.
-  3. the lane number,
-  4. the direction of the read (i.e. only R1, because these are single-end reads), and
-  5. the set number.
+  3. the lane number starting with "L" followed by 3 digits,
+  4. the direction of the read ("R1" or "R2"; use R1 for single-end reads), and
+  5. the set number (always "001").
 ```
 If metadata file and fastq files are not properly formatted, this pipeline will crash.
 

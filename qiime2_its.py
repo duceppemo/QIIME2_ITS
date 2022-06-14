@@ -86,23 +86,41 @@ class Qiime2(object):
             Qiime2Methods.make_folder(itsxpress_log_folder)
 
             # Extract Fungi ITS1 in parallel
-            if self.single:
-                Qiime2Methods.extract_its_se_parallel(self.fastq_list, its_folder, itsxpress_log_folder,
-                                                      self.cpu, self.parallel, self.taxa, self.region)
-            else:  # if self.paired:
-                Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder,
-                                                      self.cpu, self.parallel, self.taxa, self.region)
+            # if self.single:
+            #     Qiime2Methods.extract_its_se_parallel(self.fastq_list, its_folder, itsxpress_log_folder,
+            #                                           self.cpu, self.parallel, self.taxa, self.region)
+            # else:  # if self.paired:
+            #     Qiime2Methods.extract_its_pe_parallel(self.sample_dict, its_folder, itsxpress_log_folder,
+            #                                           self.cpu, self.parallel, self.taxa, self.region)
 
             # Remove empty sequences. This is an artifact from ITSxpress.
             print('Checking for empty entries...')
             its_fastq_list = Qiime2Methods.list_fastq(its_folder)
             if self.single:
-                Qiime2Methods.fix_fastq_se_parallel(self.install_path, its_fastq_list, self.cpu)
+                Qiime2Methods.fix_fastq_se_parallel(its_fastq_list, self.cpu)
+
             else:
                 its_sample_dict = self.parse_fastq_list(its_fastq_list)
-                Qiime2Methods.fix_fastq_pe_parallel(self.install_path, its_sample_dict, self.cpu)
+                Qiime2Methods.fix_fastq_pe_parallel(its_sample_dict, self.cpu)
         else:  # Not extracting ITS from reads
             its_folder = self.input_folder
+
+        # Filter reads by size
+        if self.min_len or self.max_len:  # discard reads outside of range
+            print('Filtering reads based on sizes...')
+            size_folder = self.output_folder + '/size_filtered'
+            Qiime2Methods.make_folder(size_folder)
+
+            if self.single:
+                my_fastq_list = Qiime2Methods.list_fastq(its_folder)
+                Qiime2Methods.size_select_se_parallel(my_fastq_list, size_folder, self.min_len, self.max_len,
+                                                      self.cpu, self.parallel)
+            else:
+                my_sample_dict = self.parse_fastq_list(its_fastq_list)
+                Qiime2Methods.size_select_pe_parallel(my_sample_dict, size_folder, self.min_len, self.max_len,
+                                                      self.cpu, self.parallel)
+            # Make sure to use size filtered read folder for QIIME2
+            its_folder = size_folder
 
         # Run QIIME2
         print('Running QIIME2...')
@@ -254,13 +272,21 @@ class Qiime2(object):
         error_message = ['File name must be as is:',
                          '\t1. the sample identifier,',
                          '\t2. the barcode sequence or a barcode identifier,',
-                         '\t3. the lane number,',
-                         '\t4. the direction of the read, and',
-                         '\t5. the set number.']
+                         '\t3. the lane number starting with "L" followed by 3 digits,',
+                         '\t4. the direction of the read ("R1" or "R2"), and',
+                         '\t5. the set number (always "001").']
 
         for f in self.fastq_list:
             base_name = os.path.basename(f)
             fields = base_name.split('.')[0].split('_')
+            ext = ''
+            if base_name.endswith('gz'):
+                ext = base_name.split(".")[-2]
+            else:
+                ext = base_name.split(".")[-1]
+
+            if ext != 'fastq':
+                raise Exception('\n'.join(error_message))
 
             if len(fields) != 5:
                 raise Exception('\n'.join(error_message))
@@ -292,6 +318,21 @@ class Qiime2(object):
         # Check extract-its flag
         if self.its1 and self.its2:
             raise Exception('You cannot choose both ITS1 and ITS2 during the same analysis.')
+
+        # Check taxa and region
+        if self.its1 or self.its2:
+            if self.region:
+                if self.region not in ['ITS2', 'ITS1', 'ALL']:
+                    raise Exception('Taxa must be "ITS2", "ITS1" or "ALL".')
+            if self.taxa:
+                if self.taxa not in ['Alveolata', 'Bryophyta', 'Bacillariophyta', 'Amoebozoa', 'Euglenozoa',
+                                     'Fungi', 'Chlorophyta', 'Rhodophyta', 'Phaeophyceae', 'Marchantiophyta',
+                                     'Metazoa', 'Oomycota', 'Haptophyceae', 'Raphidophyceae', ' Rhizaria',
+                                     'Synurophyceae', 'Tracheophyta', 'Eustigmatophyceae', 'All']:
+                    raise Exception('Region must be "Alveolata", "Bryophyta", "Bacillariophyta", "Amoebozoa", '
+                                    '"Euglenozoa", "Fungi", "Chlorophyta", "Rhodophyta", "Phaeophyceae", '
+                                    '"Marchantiophyta", "Metazoa", "Oomycota", "Haptophyceae", "Raphidophyceae", '
+                                    '" Rhizaria", "Synurophyceae", "Tracheophyta", "Eustigmatophyceae" or "All".')
 
     @staticmethod
     def run_fastq_rc(input_folder, output_folder):
@@ -358,12 +399,12 @@ if __name__ == '__main__':
                         help='Use this flag is your reads are in reverse complement. '
                              'For example if you sequenced from 5.8S to 18S.'
                              ' Optional.')
-    parser.add_argument('--min_len',
+    parser.add_argument('--min-len',
                         type=int, default=0,
                         required=False,
                         help='Minimum read length to keep. Default is 0 (no min length).'
                              ' Optional.')
-    parser.add_argument('--max_len',
+    parser.add_argument('--max-len',
                         type=int, default=0,
                         required=False,
                         help='Maximum read length to keep. Default is 0 (no max length).'

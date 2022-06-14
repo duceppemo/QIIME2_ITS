@@ -4,6 +4,8 @@ import os
 import pathlib
 import subprocess
 from concurrent import futures
+from collections import OrderedDict
+import gzip
 
 
 class Qiime2Methods(object):
@@ -62,9 +64,13 @@ class Qiime2Methods(object):
     def extract_its_se(fastq_file, output_folder, log_folder, cpu, taxa, region):
         """
         Extract Fungi ITS1 sequence from fastq files. Use ITSxpress program.
-        :param fastq_file: string. Fastq file path
+
+        :param fastq_file: string. Fastq file path.
         :param output_folder: string. Path of output folder.
-        :param cpu: int. number of CPU to use.
+        :param log_folder: sting. Path of log folder.
+        :param cpu: int. Number of CPU to use.
+        :param taxa: str. Taxonomy of interest.
+        :param region: string. Region of interest.
         :return:
         """
         cmd = ['itsxpress',
@@ -85,8 +91,11 @@ class Qiime2Methods(object):
         Run "extract_its" in parallel using 4 cores per instance.
         :param fastq_list: string. A list of fastq file paths.
         :param output_folder: sting. Path of output folder
+        :param log_folder: sting. Path of log folder.
         :param cpu: int. Number of cpu to use.
         :param parallel: int. Number of samples to process in parallel
+        :param taxa: str. Taxonomy of interest.
+        :param region: string. Region of interest.
         :return:
         """
         with futures.ThreadPoolExecutor(max_workers=parallel) as executor:
@@ -101,8 +110,10 @@ class Qiime2Methods(object):
         :param fastq_r1: string. Fastq file path
         :param fastq_r2: string. Fastq file path
         :param output_folder: string. Path of output folder.
-        :param log_folder:
+        :param log_folder: sting. Path of log folder.
         :param cpu: int. number of CPU to use.
+        :param taxa: str. Taxonomy of interest.
+        :param region: string. Region of interest.
         :return:
         """
         cmd = ['itsxpress',
@@ -124,8 +135,11 @@ class Qiime2Methods(object):
         Run "extract_its" in parallel using 4 cores per instance.
         :param sample_dict: string. A dictionary of fastq file paths.
         :param output_folder: sting. Path of output folder
+        :param log_folder: sting. Path of log folder.
         :param cpu: int. Number of cpu to use.
         :param parallel: int. Number of samples to process in parallel
+        :param taxa: str. Taxonomy of interest.
+        :param region: string. Region of interest.
         :return:
         """
         with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
@@ -135,58 +149,170 @@ class Qiime2Methods(object):
                 pass
 
     @staticmethod
-    def fix_fastq_se(install_path, fastq_file):
+    def remove_empties_se(input_fastq):
         """
-        Remove empty entries from a fastq file. Overwrites the input file with the output file.
-        :param install_path: string. Path to install folder.
-        :param fastq_file: string. Path of a fastq file, gzipped or not.
+        Remove empty entries (header present, but sequence and q phred scores empty) from single fastq file.
+        :param input_fastq: string. Path to single-end fastq file.
         :return:
         """
-        cmd = ['python', '{}/remove_empty_fastq_entries.py'.format(install_path),
-               '-f', fastq_file]
-        subprocess.run(cmd)
+        out_fastq = input_fastq + '.clean'
+
+        with gzip.open(out_fastq, 'wb') as out_f:
+            with gzip.open(input_fastq, 'rb') if input_fastq.endswith('gz') else open(input_fastq, 'w') as in_f:
+                seq_list = list()
+                counter = 0
+                seq_counter = 0
+                good_counter = 0
+                empties_counter = 0
+                for line in in_f:
+                    counter += 1
+                    line = line.rstrip()
+                    seq_list.append(line)
+
+                    if counter == 4:
+                        seq_counter += 1
+                        counter = 0
+                        if seq_list[1] == b'':
+                            # print('Sequence {} is empty'.format(seq_list[0].decode()))
+                            seq_list = list()
+                            empties_counter += 1
+                        else:
+                            out_f.write(b'\n'.join(seq_list) + b'\n')
+                            seq_list = list()
+                            good_counter += 1
+                print('{}: total sequences: {}, good sequences: {}, empty sequences: {}'.format(
+                    os.path.basename(input_fastq), seq_counter, good_counter, empties_counter))
+
+        # Replace old fastq file with new one
+        os.replace(out_fastq, input_fastq)
 
     @staticmethod
-    def fix_fastq_se_parallel(install_path, fastq_list, cpu):
+    def remove_empties_pe(r1, r2):
         """
-        Run "fix_fastq" in parallel using all the threads, one file per thread
-        :param install_path: string. Path to install folder.
-        :param fastq_list: string. list of fastq file paths
-        :param cpu: int. number of CPU to use
+        Remove empty entries (header present, but sequence and q phred scores empty) from paired-end fastq file.
+        Keeps both files synchronized.
+        :param r1: string. Path to R1 fastq file from pair.
+        :param r2: string. Path to R2 fastq file from pair.
         :return:
         """
-        with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
-            args = ((install_path, fastq) for fastq in fastq_list)
-            for results in executor.map(lambda p: Qiime2Methods.fix_fastq_se(*p), args):  # (*p) unpacks arguments
+        out_r1 = r1 + '.clean'
+        out_r2 = r2 + '.clean'
+
+        seq_dict = OrderedDict()
+
+        # Parse r1 into dictionary
+        with gzip.open(r1, 'rb') if r1.endswith('gz') else open(r1, 'w') as in_f:
+            seq_list = list()
+            counter = 0
+            seq_counter = 0
+
+            for line in in_f:
+                counter += 1
+                line = line.rstrip()
+                seq_list.append(line)
+
+                if counter == 4:
+                    seq_dict[seq_counter] = [seq_list]
+                    seq_counter += 1
+                    counter = 0
+                    seq_list = list()
+
+        # Add r2 to dictionary
+        with gzip.open(r2, 'rb') if r2.endswith('gz') else open(r2, 'w') as in_f:
+            seq_list = list()
+            counter = 0
+            seq_counter = 0
+
+            for line in in_f:
+                counter += 1
+                line = line.rstrip()
+                seq_list.append(line)
+
+                if counter == 4:
+                    seq_dict[seq_counter].append(seq_list)
+                    seq_counter += 1
+                    counter = 0
+                    seq_list = list()
+
+        with gzip.open(out_r1, 'wb') as fh_r1:
+            with gzip.open(out_r2, 'wb') as fh_r2:
+                empties_counter = 0
+                for read, reads_list in seq_dict.items():
+                    if seq_dict[read][0][1] == b'' or seq_dict[read][1][1] == b'':
+                        empties_counter += 1
+                        continue
+                    else:
+                        fh_r1.write(b'\n'.join(seq_dict[read][0]) + b'\n')
+                        fh_r2.write(b'\n'.join(seq_dict[read][1]) + b'\n')
+
+                print('{}: input sequences: {}, good: {}, empty: {}'.format(
+                    os.path.basename(r1).split('_')[0], len(seq_dict.keys()),
+                    len(seq_dict.keys()) - empties_counter, empties_counter))
+
+        # Replace old fastq files with new one
+        os.replace(out_r1, r1)
+        os.replace(out_r2, r2)
+
+    @staticmethod
+    def fix_fastq_se_parallel(fastq_list, parallel):
+        """
+        Run "fix_fastq" in parallel using all the threads, one file per thread
+        :param fastq_list: string. list of fastq file paths
+        :param parallel: int. number of samples to process in parallel
+        :return:
+        """
+        with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
+            for results in executor.map(Qiime2Methods.remove_empties_se, fastq_list):
                 pass
 
     @staticmethod
-    def fix_fastq_pe(install_path, fastq_r1, fastq_r2):
+    def fix_fastq_pe_parallel(sample_dict, parallel):
         """
-        Remove empty entries from a fastq file. Have to keep R1 and R2 synchronized.
-        Overwrites the input file with the output file.
-        :param install_path: string. Path to install folder.
-        :param fastq_r1: string. Path of a fastq R1 file, gzipped or not.
-        :param fastq_r2: string. Path of a fastq R2 file, gzipped or not.
+        Run "fix_fastq" in parallel using all the threads, one file per thread
+        :param sample_dict: string. Dictionary of fastq file paths
+        :param parallel: int. number of samples to process in parallel
         :return:
         """
-        cmd = ['python', '{}/remove_empty_fastq_entries.py'.format(install_path),
-               '-f', fastq_r1,
-               '-f2', fastq_r2]
+        with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
+            args = ((fastq_list[0], fastq_list[1]) for sample, fastq_list in sample_dict.items())
+            for results in executor.map(lambda p: Qiime2Methods.remove_empties_pe(*p), args):  # (*p) unpacks
+                pass
+
+    @staticmethod
+    def size_select_se(r1, out_folder, min_len, max_len, cpu):
+        cmd = ['bbduk.sh',
+               'in={}'.format(r1),
+               'out={}'.format(out_folder + '/' + os.path.basename(r1)),
+               'minlength={}'.format(min_len),
+               'maxlength={}'.format(max_len),
+               'threads={}'.format(cpu)]
         subprocess.run(cmd)
 
     @staticmethod
-    def fix_fastq_pe_parallel(install_path, sample_dict, cpu):
-        """
-        Run "fix_fastq" in parallel using all the threads, one file per thread
-        :param install_path: string. Path to install folder.
-        :param sample_dict: string. Dictionary of fastq file paths
-        :param cpu: int. number of CPU to use
-        :return:
-        """
-        with futures.ThreadPoolExecutor(max_workers=cpu) as executor:
-            args = ((install_path, fastq_list[0], fastq_list[1]) for sample, fastq_list in sample_dict.items())
-            for results in executor.map(lambda p: Qiime2Methods.fix_fastq_pe(*p), args):  # (*p) unpacks arguments
+    def size_select_pe(r1, r2, out_folder, min_len, max_len, cpu):
+        cmd = ['bbduk.sh',
+               'in={}'.format(r1),
+               'in2={}'.format(r2),
+               'out={}'.format(out_folder + '/' + os.path.basename(r1)),
+               'out2={}'.format(out_folder + '/' + os.path.basename(r2)),
+               'minlength={}'.format(min_len),
+               'maxlength={}'.format(max_len),
+               'threads={}'.format(cpu)]
+        subprocess.run(cmd)
+
+    @staticmethod
+    def size_select_se_parallel(fastq_list, out_folder, min_len, max_len, cpu, parallel):
+        with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
+            args = ((fastq, out_folder, min_len, max_len, int(cpu/parallel)) for fastq in fastq_list)
+            for results in executor.map(lambda p: Qiime2Methods.size_select_se(*p), args):  # (*p) unpacks arguments
+                pass
+
+    @staticmethod
+    def size_select_pe_parallel(sample_dict, out_folder, min_len, max_len, cpu, parallel):
+        with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
+            args = ((fastq_list[0], fastq_list[1], out_folder, min_len, max_len, int(cpu/parallel))
+                    for sample, fastq_list in sample_dict.items())
+            for results in executor.map(lambda p: Qiime2Methods.size_select_pe(*p), args):  # (*p) unpacks arguments
                 pass
 
     @staticmethod
@@ -239,7 +365,7 @@ class Qiime2Methods(object):
     @staticmethod
     def qiime2_dada2_denoise_single(reads_qza, repseq_qza, table_qza, stats_qza):
         """
-        Denoise single-end reads with DADA2
+        Denoise single-end reads with DADA2. Optimized for Illumina.
         :param reads_qza:
         :param repseq_qza:
         :param table_qza:
@@ -259,7 +385,7 @@ class Qiime2Methods(object):
     @staticmethod
     def qiime2_dada2_denoise_paired(reads_qza, repseq_qza, table_qza, stats_qza):
         """
-        Denoise paired-end reads with DADA2
+        Denoise paired-end reads with DADA2. Optimized for Illumina.
         :param reads_qza:
         :param repseq_qza:
         :param table_qza:
