@@ -75,8 +75,8 @@ python train_ncbi_classifier_qiime2.py \
 ## Usage
 Don't forget to activate your environment, if not already done.
 ```
-usage: python qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o /output_folder/ -m qiime2_metadata.tsv -c unite_classifier_qiime2.qza [-t 4] [-p 4] [-rc] [--min_len MIN_LEN] [--max_len MAX_LEN] [-se] [-pe] [--extract-its1]
-                            [--extract-its2] [--taxa Fungi]
+usage: python qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o /output_folder/ -m qiime2_metadata.tsv -c unite_classifier_qiime2.qza [-t 4] [-p 1] [-rc] [--min-len MIN_LEN] [--max-len MAX_LEN] [-se] [-pe] [--extract-its1]
+                     [--extract-its2] [--taxa Fungi]
 
 Run QIIME2 on IonTorrent sequencing data using the UNITE database
 
@@ -93,18 +93,17 @@ optional arguments:
   -c unite_classifier_qiime2.qza, --classifier unite_classifier_qiime2.qza
                         Classifier for QIIME2. See script "train_unite_classifier_qiime2.py" to compile it. Mandatory.
   -t 4, --threads 4     Number of CPU. Default is 4.
-  -p 4, --parallel-processes 4
-                        Processes to run in parallel. Adjust according the number of threads. For example, if 16 threads, using 4 parallel processes will run 4 samples in parallel using 4 threads each (16/4). Default is 4.
+  -p 1, --parallel-processes 1
+                        Processes to run in parallel. Adjust according the number of threads. For example, if 16 threads, using 4 parallel processes will run 4 samples in parallel using 4 threads each (16/4). Default is 1.
   -rc, --reverse_complement
                         Use this flag is your reads are in reverse complement. For example if you sequenced from 5.8S to 18S. Optional.
-  --min_len MIN_LEN     Minimum read length to keep. Default is 0 (no min length). Optional.
-  --max_len MAX_LEN     Maximum read length to keep. Default is 0 (no max length). Optional.
+  --min-len MIN_LEN     Minimum read length to keep. Default is 0 (no min length). Optional.
+  --max-len MAX_LEN     Maximum read length to keep. Default is 0 (no max length). Optional.
   -se                   Reads are single-end. One fastq file per sample. "-se" or "-pe" mandatory.
   -pe                   Reads are paired-end. Two fastq file per sample. "-se" or "-pe" mandatory.
   --extract-its1        Extract ITS1 sequence from reads with ITSxpress. Cannot be used with "--extract-its2".
   --extract-its2        Extract ITS2 sequence from reads with ITSxpress. Cannot be used with "--extract-its1".
-  --taxa Fungi          Select taxa of interest for ITSxpress: {Alveolata,Bryophyta,Bacillariophyta,Amoebozoa,Euglenozoa,Fungi,Chlorophyta,Rhodophyta,Phaeophyceae,Marchantiophyta,Metazoa,Oomycota,Haptophyceae,Raphidophyceae,
+  --taxa Fungi          Select taxa of interest for ITSxpress:
+                        {Alveolata,Bryophyta,Bacillariophyta,Amoebozoa,Euglenozoa,Fungi,Chlorophyta,Rhodophyta,Phaeophyceae,Marchantiophyta,Metazoa,Oomycota,Haptophyceae,Raphidophyceae,
                         Rhizaria,Synurophyceae,Tracheophyta,Eustigmatophyceae,All}
 ```
-## TODO
-- Implement min/max lengths

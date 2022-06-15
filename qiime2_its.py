@@ -8,9 +8,6 @@ from qiime2_methods import Qiime2Methods
 from collections import defaultdict
 
 
-# TODO: add an option to select taxa for ITSxpress
-
-
 class Qiime2(object):
     def __init__(self, args):
         self.args = args
@@ -387,12 +384,12 @@ if __name__ == '__main__':
                         required=False, default=4,
                         type=int,
                         help='Number of CPU. Default is 4.')
-    parser.add_argument('-p', '--parallel-processes', metavar='4',
-                        required=False, default=4,
+    parser.add_argument('-p', '--parallel-processes', metavar='1',
+                        required=False, default=1,
                         type=int,
                         help='Processes to run in parallel. Adjust according the number of threads. '
                              'For example, if 16 threads, using 4 parallel processes will run 4 samples in parallel '
-                             'using 4 threads each (16/4). Default is 4.')
+                             'using 4 threads each (16/4). Default is 1.')
     parser.add_argument('-rc', '--reverse_complement',
                         action='store_true',  # 'store_true' means False by default
                         required=False,
