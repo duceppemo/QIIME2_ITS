@@ -65,7 +65,6 @@ class Methods(object):
         with open(file_path, 'wb') as out_file:
             with urlopen(url) as response:
                 shutil.copyfileobj(response, out_file)
-                # Methods.copyfile(response, out_file)
 
     @staticmethod
     def download_parallel(url_list, path_list, cpu):
@@ -75,14 +74,12 @@ class Methods(object):
                 pass
 
     @staticmethod
-    def untargz(targz_file):
+    def untargz(targz_file, output_path):
         """
         Decompress and return path of UNITE sequence and taxonomy files
         :param targz_file: string. Path to .tar.gz file
         :return:
         """
-        # Path of uncompressed file is same as compressed file
-        output_path = os.path.dirname(targz_file)
 
         if targz_file.endswith('.tar.gz'):
             with tarfile.open(targz_file, "r:gz") as f:  # Open for reading with gzip compression
@@ -160,7 +157,10 @@ class Methods(object):
         return acc_dict
 
     @staticmethod
-    def parse_acc2taxid_file(acc2taxid):
+    def parse_acc2taxid_file(acc2taxid, acc_dict):
+        # Remove version to accession number from acc_dict
+        acc_dict_no_version = {k.split('.')[0]: v for k, v in acc_dict.items()}
+
         acc2taxid_dict = dict()
         # Parse acc2taxid gzippped file
         with gzip.open(acc2taxid, 'rb') as f:
@@ -169,7 +169,8 @@ class Methods(object):
                 field_list = line.decode().split('\t')
                 acc = field_list[0]
                 taxid = field_list[2]
-                acc2taxid_dict[acc] = taxid
+                if acc in acc_dict_no_version:
+                    acc2taxid_dict[acc] = taxid
 
         return acc2taxid_dict
 
@@ -221,10 +222,10 @@ class Methods(object):
                 try:
                     f.write('{}\t{}\n'.format(acc, acc2taxid_dict[acc.split('.')[0]]))
                 except KeyError as e:
-                    # print('The following accession was not found in the taxdump files: {}'.format(e))
                     missing_acc2taxid.append(e.args[0])
                     f.write('{}\t{}\n'.format(acc, '12908'))  # unclassified sequence
-        print('The following accession was not found in the taxdump files: {}'.format(', '.join(missing_acc2taxid)))
+        if missing_acc2taxid:
+            print('\nThe following accession was not found in the taxdump files: {}'.format(', '.join(missing_acc2taxid)))
 
     @staticmethod
     def expand_taxonomy_from_taxid(taxid_file, taxonomy_file, nodes_file, names_file, merged_file):
@@ -369,6 +370,9 @@ class DbBuilder(object):
         self.cpu = args.threads
         self.email = args.email
         self.api = args.api_key
+        self.taxdump = args.taxdump
+        self.acc2taxid = args.acc2taxid
+        self.dead_acc2taxid = args.dead_acc2taxid
 
         # Run
         self.run()
@@ -380,34 +384,53 @@ class DbBuilder(object):
         # Check a few things before starting processing data
         self.checks()
 
+        # Download nucleotide sequences of the query result
+        seq_file = self.output_folder + '/seq.fasta'
+
+        # Don't download again if retrying because the other files failed
+        if not os.path.exists(self.output_folder + '/seq.fasta'):
+            Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
+
         # Download and extract taxdump
-        print('Downloading taxdump.tar.gz... ', end="", flush=True)
         start_time = time()
-        Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
-        Methods.untargz(self.output_folder + '/taxdump.tar.gz')
-        end_time = time()
+        if self.taxdump:
+            print('Extracting taxdump.tar.gz... ', end="", flush=True)
+            Methods.untargz(self.taxdump, self.output_folder)
+            end_time = time()
+        else:
+            print('Downloading taxdump.tar.gz... ', end="", flush=True)
+            Methods.download(DbBuilder.taxdump_url, self.output_folder + '/taxdump.tar.gz')
+            Methods.untargz(self.output_folder + '/taxdump.tar.gz', self.output_folder)
+            end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
 
         # Download nucleotide accession2taxid
-        print('Downloading accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
-        end_time = time()
+        if self.acc2taxid:
+            print('Extracting accession2taxid.gz... ', end="", flush=True)
+            Methods.untargz(self.acc2taxid, self.output_folder)
+            end_time = time()
+        else:
+            print('Downloading accession2taxid.gz... ', end="", flush=True)
+            start_time = time()
+            Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
+            end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
 
         # Download dead nucleotide accession2taxid
-        print('Downloading dead_nucl.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
-        end_time = time()
+        if self.dead_acc2taxid:
+            print('Extracting dead_nucl.accession2taxid.gz... ', end="", flush=True)
+            Methods.untargz(self.dead_acc2taxid, self.output_folder)
+            end_time = time()
+        else:
+            print('Downloading dead_nucl.accession2taxid.gz... ', end="", flush=True)
+            Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
+            end_time = time()
         interval = end_time - start_time
         print(" took %s" % Methods.elapsed_time(interval))
-
-        # Download nucleotide sequences of the query result
-        seq_file = self.output_folder + '/seq.fasta'
-        Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
 
         # Extract accession numbers from downloaded fasta sequences
         print('Extracting accession numbers from fasta file...', end="", flush=True)
@@ -420,7 +443,7 @@ class DbBuilder(object):
 
         print('Parsing nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz')
+        acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz', acc_dict)
         # acc2taxid_dict = Methods.parse_acc2taxid_file_parallel(self.output_folder + '/nucl_gb.accession2taxid.gz', self.cpu)  # slower
         end_time = time()
         interval = end_time - start_time
@@ -428,7 +451,8 @@ class DbBuilder(object):
 
         print('Parsing dead_nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz'))
+        acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz',
+                                                           acc_dict))
         # acc2taxid_dict.update(Methods.parse_acc2taxid_file_parallel(self.output_folder + '/dead_nucl.accession2taxid.gz', self.cpu))  # slower
         end_time = time()
         interval = end_time - start_time
@@ -513,6 +537,18 @@ if __name__ == '__main__':
                         required=False,
                         type=str,
                         help='Your NCBI API key. Allows up to 10 requests per second instead of 3.')
+    parser.add_argument('--taxdump', metavar='/path/to/taxdump.tar.gz',
+                        required=False,
+                        type=str,
+                        help='Path to downloaded taxdump.tar.gz.')
+    parser.add_argument('--acc2taxid', metavar='/path/to/nucl_gb.accession2taxid.gz',
+                        required=False,
+                        type=str,
+                        help='Path to downloaded nucl_gb.accession2taxid.gz.')
+    parser.add_argument('--dead-acc2taxid', metavar='/path/to/dead_nucl.accession2taxid.gz',
+                        required=False,
+                        type=str,
+                        help='Path to downloaded dead_nucl.accession2taxid.gz.')
 
     # Get the arguments into an object
     arguments = parser.parse_args()

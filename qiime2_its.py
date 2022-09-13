@@ -64,6 +64,7 @@ class Qiime2(object):
 
         # Parse samples and their locations in a dictionary
         self.sample_dict = self.parse_fastq_list(self.fastq_list)
+        its_fastq_list = list()
 
         if self.its1 or self.its2:  # Extracting ITS region from reads
             # Check for reverse complement flag
