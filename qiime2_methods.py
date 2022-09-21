@@ -281,16 +281,20 @@ class Qiime2Methods(object):
     @staticmethod
     def size_select_se(r1, out_folder, min_len, max_len, cpu):
         cmd = ['bbduk.sh',
+               'overwrite=t',
                'in={}'.format(r1),
                'out={}'.format(out_folder + '/' + os.path.basename(r1)),
                'minlength={}'.format(min_len),
                'maxlength={}'.format(max_len),
                'threads={}'.format(cpu)]
-        subprocess.run(cmd)
+        if max_len == 0:
+            del cmd[5]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
     @staticmethod
     def size_select_pe(r1, r2, out_folder, min_len, max_len, cpu):
         cmd = ['bbduk.sh',
+               'overwrite=t',
                'in={}'.format(r1),
                'in2={}'.format(r2),
                'out={}'.format(out_folder + '/' + os.path.basename(r1)),
@@ -298,7 +302,9 @@ class Qiime2Methods(object):
                'minlength={}'.format(min_len),
                'maxlength={}'.format(max_len),
                'threads={}'.format(cpu)]
-        subprocess.run(cmd)
+        if max_len == 0:
+            del cmd[7]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
     @staticmethod
     def size_select_se_parallel(fastq_list, out_folder, min_len, max_len, cpu, parallel):
