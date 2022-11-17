@@ -348,7 +348,7 @@ class Methods(object):
         :param classifier_file: string. QIIME2 classifier file (.qza)
         :return:
         """
-        cmd = ['qiime', 'feature-classifier', 'fit-classifier-sklearn',
+        cmd = ['qiime', 'feature-classifier', 'fit-classifier-naive-bayes',
                '--i-reference-reads', sequence_file,
                '--i-reference-taxonomy', taxonomy_file,
                '--o-classifier', classifier_file]
