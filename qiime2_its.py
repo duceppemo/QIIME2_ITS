@@ -104,10 +104,13 @@ class Qiime2(object):
             its_folder = self.input_folder
 
         # Filter reads by size
-        if self.min_len or self.max_len:  # discard reads outside of range
+        if self.min_len > 0 or self.max_len > 0:  # discard reads outside of range
             print('Filtering reads based on sizes...')
             size_folder = self.output_folder + '/size_filtered'
             Qiime2Methods.make_folder(size_folder)
+
+            # if self.max_len == 0:
+            #     self.max_len = ''
 
             if self.single:
                 my_fastq_list = Qiime2Methods.list_fastq(its_folder)
