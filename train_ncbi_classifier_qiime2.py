@@ -3,9 +3,7 @@ import http.client
 from argparse import ArgumentParser
 from multiprocessing import cpu_count
 from time import time
-
 import shutil
-from itertools import islice
 from urllib.request import urlopen
 from pathlib import Path
 import os
@@ -16,7 +14,6 @@ from time import sleep
 import gzip
 import numpy as np
 import subprocess
-import multiprocessing as mp
 
 
 # TODO: add download progressbar
@@ -78,6 +75,7 @@ class Methods(object):
         """
         Decompress and return path of UNITE sequence and taxonomy files
         :param targz_file: string. Path to .tar.gz file
+        :param output_path: string. Path to uncompressed file
         :return:
         """
 
@@ -94,51 +92,86 @@ class Methods(object):
         Entrez.sleep_between_tries = 15
         Entrez.max_tries = 3
 
-        # Search
-        print('Searching NCBI for \'{}\'.'.format(query))
-        search_handle = Entrez.esearch(db='nucleotide', term=query, idtype="acc", usehistory='y')
-        search_results = Entrez.read(search_handle)
-        search_handle.close()
+        if os.path.exists(query) and os.path.isfile(query):  # Query is a file with one acc per line
+            acc_list = list()
+            with open(query, 'r') as f:
+                for line in f:
+                    line = line.rstrip()
+                    if not line:
+                        continue
+                    acc_list.append(line)
+            count = len(acc_list)
 
-        count = int(search_results["Count"])
-        webenv = search_results["WebEnv"]
-        query_key = search_results["QueryKey"]
+            print('Downloading {} records...'.format(count))
+            batch_size = 300
+            with open(seq_file, "w") as out_handle:
+                for start in range(0, count, batch_size):
+                    end = min(count, start + batch_size)
+                    print("\tDownloading record %i to %i (%i)" % (start + 1, end, count))
+                    try:  # Trying to deal with "http.client.IncompleteRead
+                        fetch_handle = Entrez.efetch(
+                            db="nucleotide",
+                            rettype="fasta",
+                            retmode="text",
+                            id=','.join(acc_list[start:end]))
+                    except (http.client.IncompleteRead, ValueError) as e:
+                        print('Network error ({}). Last attempt.'.format(e))
+                        fetch_handle = Entrez.efetch(
+                            db="nucleotide",
+                            rettype="fasta",
+                            retmode="text",
+                            id=','.join(acc_list[start:end]))
 
-        print('Found {} records.'.format(count))
+                    data = fetch_handle.read()
+                    fetch_handle.close()
+                    out_handle.write(data)
+                    sleep(0.5)
 
-        # Fetch
-        print('Downloading sequences.')
-        batch_size = 300
-        with open(seq_file, "w") as out_handle:
-            for start in range(0, count, batch_size):
-                end = min(count, start + batch_size)
-                print("Downloading record %i to %i" % (start + 1, end))
-                try:  # Trying to deal with "http.client.IncompleteRead
-                    fetch_handle = Entrez.efetch(
-                        db="nucleotide",
-                        rettype="fasta",
-                        retmode="text",
-                        retstart=start,
-                        retmax=batch_size,
-                        webenv=webenv,
-                        query_key=query_key,
-                        idtype="acc")
-                except (http.client.IncompleteRead, ValueError) as e:
-                    print('Network error ({}). Last attempt.'.format(e))
-                    fetch_handle = Entrez.efetch(
-                        db="nucleotide",
-                        rettype="fasta",
-                        retmode="text",
-                        retstart=start,
-                        retmax=batch_size,
-                        webenv=webenv,
-                        query_key=query_key,
-                        idtype="acc")
+        else:  # query is a string
+            # Search
+            print('Searching NCBI for \'{}\'.'.format(query))
+            # ESearch URL can only retrieve up to 100,000 UIDs
+            search_handle = Entrez.esearch(db='nucleotide', term=query, idtype="acc", usehistory='y')
+            search_results = Entrez.read(search_handle)
+            search_handle.close()
 
-                data = fetch_handle.read()
-                fetch_handle.close()
-                out_handle.write(data)
-                sleep(0.5)
+            count = int(search_results["Count"])
+            webenv = search_results["WebEnv"]
+            query_key = search_results["QueryKey"]
+
+            # Fetch
+            print('Downloading {} records...'.format(count))
+            batch_size = 300
+            with open(seq_file, "w") as out_handle:
+                for start in range(0, count, batch_size):
+                    end = min(count, start + batch_size)
+                    print("\tDownloading record %i to %i (%i)" % (start + 1, end, count))
+                    try:  # Trying to deal with "http.client.IncompleteRead
+                        fetch_handle = Entrez.efetch(
+                            db="nucleotide",
+                            rettype="fasta",
+                            retmode="text",
+                            retstart=start,
+                            retmax=batch_size,
+                            webenv=webenv,
+                            query_key=query_key,
+                            idtype="acc")
+                    except (http.client.IncompleteRead, ValueError) as e:
+                        print('Network error ({}). Last attempt.'.format(e))
+                        fetch_handle = Entrez.efetch(
+                            db="nucleotide",
+                            rettype="fasta",
+                            retmode="text",
+                            retstart=start,
+                            retmax=batch_size,
+                            webenv=webenv,
+                            query_key=query_key,
+                            idtype="acc")
+
+                    data = fetch_handle.read()
+                    fetch_handle.close()
+                    out_handle.write(data)
+                    sleep(0.5)
 
     @staticmethod
     def extract_acc_from_fasta(input_fasta, acc_file):
@@ -311,7 +344,7 @@ class Methods(object):
                     taxo_dict['o'], taxo_dict['f'], taxo_dict['g'], taxo_dict['s']))
 
     @staticmethod
-    def qiime2_import_unite_sequences(sequence_file, qiime2_sequence_file):
+    def qiime2_import_ncbi_sequences(sequence_file, qiime2_sequence_file):
         """
         :param sequence_file:
         :param qiime2_sequence_file:
@@ -325,7 +358,7 @@ class Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_import_unite_taxonomy(taxonomy_file, qiime2_taxonomy_file):
+    def qiime2_import_ncbi_taxonomy(taxonomy_file, qiime2_taxonomy_file):
         """
         :param taxonomy_file:
         :param qiime2_taxonomy_file:
@@ -339,7 +372,7 @@ class Methods(object):
         subprocess.run(cmd)
 
     @staticmethod
-    def qiime2_train_unite_classifier(sequence_file, taxonomy_file, classifier_file):
+    def qiime2_train_ncbi_classifier(sequence_file, taxonomy_file, classifier_file):
         """
         # Training the QIIME2 Classifier with UNITE ITS Reference Sequences
         # http://john-quensen.com/tutorials/training-the-qiime2-classifier-with-unite-its-reference-sequences/
@@ -387,7 +420,7 @@ class DbBuilder(object):
         # Download nucleotide sequences of the query result
         seq_file = self.output_folder + '/seq.fasta'
 
-        # Don't download again if retrying because the other files failed
+        # Don't download again if retrying because the ncbi database files failed
         if not os.path.exists(self.output_folder + '/seq.fasta'):
             Methods.download_seq_from_query(self.query, seq_file, self.email, self.api)
 
@@ -407,30 +440,22 @@ class DbBuilder(object):
 
         # Download nucleotide accession2taxid
         start_time = time()
-        if self.acc2taxid:
-            print('Extracting accession2taxid.gz... ', end="", flush=True)
-            Methods.untargz(self.acc2taxid, self.output_folder)
-            end_time = time()
-        else:
+        if not self.acc2taxid:
             print('Downloading accession2taxid.gz... ', end="", flush=True)
             start_time = time()
             Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/nucl_gb.accession2taxid.gz')
             end_time = time()
-        interval = end_time - start_time
-        print(" took %s" % Methods.elapsed_time(interval))
+            interval = end_time - start_time
+            print(" took %s" % Methods.elapsed_time(interval))
 
         # Download dead nucleotide accession2taxid
         start_time = time()
-        if self.dead_acc2taxid:
-            print('Extracting dead_nucl.accession2taxid.gz... ', end="", flush=True)
-            Methods.untargz(self.dead_acc2taxid, self.output_folder)
-            end_time = time()
-        else:
+        if not self.dead_acc2taxid:
             print('Downloading dead_nucl.accession2taxid.gz... ', end="", flush=True)
             Methods.download(DbBuilder.acc2taxid_url, self.output_folder + '/dead_nucl.accession2taxid.gz')
             end_time = time()
-        interval = end_time - start_time
-        print(" took %s" % Methods.elapsed_time(interval))
+            interval = end_time - start_time
+            print(" took %s" % Methods.elapsed_time(interval))
 
         # Extract accession numbers from downloaded fasta sequences
         print('Extracting accession numbers from fasta file...', end="", flush=True)
@@ -443,7 +468,10 @@ class DbBuilder(object):
 
         print('Parsing nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz', acc_dict)
+        if self.acc2taxid:
+            acc2taxid_dict = Methods.parse_acc2taxid_file(self.acc2taxid, acc_dict)
+        else:
+            acc2taxid_dict = Methods.parse_acc2taxid_file(self.output_folder + '/nucl_gb.accession2taxid.gz', acc_dict)
         # acc2taxid_dict = Methods.parse_acc2taxid_file_parallel(self.output_folder + '/nucl_gb.accession2taxid.gz', self.cpu)  # slower
         end_time = time()
         interval = end_time - start_time
@@ -451,8 +479,11 @@ class DbBuilder(object):
 
         print('Parsing dead_nucl_gb.accession2taxid.gz... ', end="", flush=True)
         start_time = time()
-        acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz',
-                                                           acc_dict))
+        if self.dead_acc2taxid:
+            acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.dead_acc2taxid, acc_dict))
+        else:
+            acc2taxid_dict.update(Methods.parse_acc2taxid_file(self.output_folder + '/dead_nucl.accession2taxid.gz',
+                                                               acc_dict))
         # acc2taxid_dict.update(Methods.parse_acc2taxid_file_parallel(self.output_folder + '/dead_nucl.accession2taxid.gz', self.cpu))  # slower
         end_time = time()
         interval = end_time - start_time
@@ -484,14 +515,14 @@ class DbBuilder(object):
         qiime2_taxo = taxonomy_file + '.qza'
 
         print('Importing fasta file in QIIME2...')
-        Methods.qiime2_import_unite_sequences(seq_file, qiime2_seq)
+        Methods.qiime2_import_ncbi_sequences(seq_file, qiime2_seq)
 
         print('Importing fasta file in QIIME2...')
-        Methods.qiime2_import_unite_taxonomy(taxonomy_file, qiime2_taxo)
+        Methods.qiime2_import_ncbi_taxonomy(taxonomy_file, qiime2_taxo)
 
         print('Training classifier...')
         classifier_file = self.output_folder + '/seq_ncbi.qza'
-        Methods.qiime2_train_unite_classifier(qiime2_seq, qiime2_taxo, classifier_file)
+        Methods.qiime2_train_ncbi_classifier(qiime2_seq, qiime2_taxo, classifier_file)
 
         end_time = time()
         interval = end_time - t_zero
@@ -518,37 +549,35 @@ if __name__ == '__main__':
     parser.add_argument('-q', '--query', metavar='\"txid4762[Organism:exp] AND (\"internal transcribed spacer\"[Title]) NOT uncultured[Title]\"',
                         required=True,
                         type=str,
-                        help='NCBI query string.'
-                             ' Mandatory.')
+                        help='NCBI query string or a file with one accession number per line. Mandatory.')
     parser.add_argument('-o', '--output', metavar='/output_folder/',
                         required=True,
                         type=str,
-                        help='Output folder.'
-                             ' Mandatory.')
+                        help='Output folder. Mandatory.')
     parser.add_argument('-t', '--threads', metavar='4',
                         required=False, default=4,
                         type=int,
-                        help='Number of CPU. Default is 4.')
+                        help='Number of CPU. Default is 4. Optional.')
     parser.add_argument('-e', '--email', metavar='your.email@example.org',
                         required=False, default='\'your.email@example.org\'',
                         type=str,
-                        help='Your email address.')
+                        help='Your email address. Optional.')
     parser.add_argument('-a', '--api-key', metavar='',
                         required=False,
                         type=str,
-                        help='Your NCBI API key. Allows up to 10 requests per second instead of 3.')
+                        help='Your NCBI API key. Allows up to 10 requests per second instead of 3. Optional.')
     parser.add_argument('--taxdump', metavar='/path/to/taxdump.tar.gz',
                         required=False,
                         type=str,
-                        help='Path to downloaded taxdump.tar.gz.')
+                        help='Path to downloaded taxdump.tar.gz. Optional.')
     parser.add_argument('--acc2taxid', metavar='/path/to/nucl_gb.accession2taxid.gz',
                         required=False,
                         type=str,
-                        help='Path to downloaded nucl_gb.accession2taxid.gz.')
+                        help='Path to downloaded nucl_gb.accession2taxid.gz. Optional.')
     parser.add_argument('--dead-acc2taxid', metavar='/path/to/dead_nucl.accession2taxid.gz',
                         required=False,
                         type=str,
-                        help='Path to downloaded dead_nucl.accession2taxid.gz.')
+                        help='Path to downloaded dead_nucl.accession2taxid.gz. Optional.')
 
     # Get the arguments into an object
     arguments = parser.parse_args()

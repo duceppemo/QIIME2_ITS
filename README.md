@@ -69,7 +69,7 @@ python train_ncbi_classifier_qiime2.py \
     -q "txid4762[Organism:exp] AND (\"internal transcribed spacer\"[Title]) NOT uncultured[Title]" \
     -t 48 \
     -o /oomycetes_DB \
-    -e your_email@probider.org \
+    -e your_email@provider.org \
     -a ncbiapikeyisoptionalebutrecommended0
 ```
 ## Usage
