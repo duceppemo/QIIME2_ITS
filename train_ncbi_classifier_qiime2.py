@@ -16,6 +16,10 @@ import numpy as np
 import subprocess
 
 
+__author__ = 'duceppemo'
+__version__ = '0.1'
+
+
 # TODO: add download progressbar
 #  (https://stackoverflow.com/questions/41106599/python-3-5-urllib-request-urlopen-progress-bar-available)
 # TODO: check if taxonomy download files are already present and skip download
@@ -549,7 +553,7 @@ if __name__ == '__main__':
     parser.add_argument('-q', '--query', metavar='\"txid4762[Organism:exp] AND (\"internal transcribed spacer\"[Title]) NOT uncultured[Title]\"',
                         required=True,
                         type=str,
-                        help='NCBI query string or a file with one accession number per line. Mandatory.')
+                        help='NCBI query string OR a text file with one accession number per line. Mandatory.')
     parser.add_argument('-o', '--output', metavar='/output_folder/',
                         required=True,
                         type=str,

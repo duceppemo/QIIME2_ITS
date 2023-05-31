@@ -48,35 +48,50 @@ cd QIIME2_ITS
 python qiime2_its.py -h
 ```
 ## Database
-In order to use this pipeline, you have to have a qiime2 classifier available.
+In order to use this pipeline, you have to have a qiime2 classifier available. Note that if you update your QIIME2 version, you might need to recompile the classifier.
 
-Here are the instruction to build the UNITE qiime2 classifier using the included helper script `train_unite_classifier_qiime2.py`:
+Here are the instruction to build the UNITE qiime2 classifier using the included helper script `train_unite_classifier_qiime2.py`. Use `python train_unite_classifier_qiime2.py -h` for more options.
 ```
 # QIIME files for unite are located at https://unite.ut.ee/repository.php under the "QIIME release" drop down menu.
-# Replace the url ("-u"), the datase location ("-o") and the qiime2 ("-q") to suit your installation.
+# Replace the url ("-u"), the datase location ("-o") and the qiime2 ("-q") to suit your installation. If you have
+# already downloaded the QIIME release file, you can substitute the URL with the actual ".tgz" file.
 
 conda activate qiime2-2021.2  # If you didn't alread activated it
 
+# Using the URL
 python train_unite_classifier_qiime2.py \
     -u https://files.plutof.ut.ee/public/orig/C5/54/C5547B97AAA979E45F79DC4C8C4B12113389343D7588716B5AD330F8BDB300C9.tgz \
     -o '/db/UNITE' \
     -q qiime2-2021.2
+
+# Using the downloaded file
+python train_unite_classifier_qiime2.py \
+    -u ~/Download/C5547B97AAA979E45F79DC4C8C4B12113389343D7588716B5AD330F8BDB300C9.tgz \
+    -o '/db/UNITE' \
+    -q qiime2-2021.2
 ```
 
-Here's how to build a classifier from sequences downloaded from genbank with the script `train_ncbi_classifier_qiime2.py`. That script takes care of downloading the sequences, the taxonomy and train the QIIME2 classifier. It takes as input a NCBI query input. It is strongly recommended testing your query string on NCBI's website first to make sure you get the right sequences:
+Here's how to build a classifier with sequences hosted on GenBank with the script `train_ncbi_classifier_qiime2.py`. That script takes care of downloading the sequences, the taxonomy and train the QIIME2 classifier. It takes as input a NCBI query input or a text file with one accession number per line. It is strongly recommended testing your query string on NCBI's website first to make sure you get the right sequences. Use `python train_ncbi_classifier_qiime2.py -h` for more options.  
 ```
+# Using query string:
 python train_ncbi_classifier_qiime2.py \
     -q "txid4762[Organism:exp] AND (\"internal transcribed spacer\"[Title]) NOT uncultured[Title]" \
     -t 48 \
     -o /oomycetes_DB \
     -e your_email@provider.org \
     -a ncbiapikeyisoptionalebutrecommended0
+
+# Using a text file with accessions:
+python train_ncbi_classifier_qiime2.py \
+    -q ~/Download/accession.list \
+    -t 48 \
+    -o /oomycetes_DB \
 ```
-## Usage
+## Usage - qiime2.py
 Don't forget to activate your environment, if not already done.
 ```
-usage: python qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o /output_folder/ -m qiime2_metadata.tsv -c unite_classifier_qiime2.qza [-t 4] [-p 1] [-rc] [--min-len MIN_LEN] [--max-len MAX_LEN] [-se] [-pe] [--extract-its1]
-                     [--extract-its2] [--taxa Fungi]
+usage: python qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o /output_folder/ -m qiime2_metadata.tsv -c unite_classifier_qiime2.qza [-t 4] [-p 1] [-rc] [--min-len MIN_LEN] [--max-len MAX_LEN] [-se] [-pe]
+                            [--extract-its1] [--extract-its2] [--taxa Fungi]
 
 Run QIIME2 on IonTorrent sequencing data using the UNITE database
 
@@ -94,7 +109,8 @@ optional arguments:
                         Classifier for QIIME2. See script "train_unite_classifier_qiime2.py" to compile it. Mandatory.
   -t 4, --threads 4     Number of CPU. Default is 4.
   -p 1, --parallel-processes 1
-                        Processes to run in parallel. Adjust according the number of threads. For example, if 16 threads, using 4 parallel processes will run 4 samples in parallel using 4 threads each (16/4). Default is 1.
+                        Processes to run in parallel. Adjust according the number of threads. For example, if 16 threads, using 4 parallel processes will run 4 samples in parallel using 4 threads each (16/4). Default
+                        is 1.
   -rc, --reverse_complement
                         Use this flag is your reads are in reverse complement. For example if you sequenced from 5.8S to 18S. Optional.
   --min-len MIN_LEN     Minimum read length to keep. Default is 0 (no min length). Optional.
@@ -106,4 +122,46 @@ optional arguments:
   --taxa Fungi          Select taxa of interest for ITSxpress:
                         {Alveolata,Bryophyta,Bacillariophyta,Amoebozoa,Euglenozoa,Fungi,Chlorophyta,Rhodophyta,Phaeophyceae,Marchantiophyta,Metazoa,Oomycota,Haptophyceae,Raphidophyceae,
                         Rhizaria,Synurophyceae,Tracheophyta,Eustigmatophyceae,All}
+```
+
+## Usage - train_ncbi_classifier_qiime2.py
+```commandline
+usage: python train_ncbi_classifier_qiime2.py [-h] -q "txid4762[Organism:exp] AND "internal transcribed spacer"[Title] NOT uncultured[Title]" -o /output_folder/ [-t 4] [-e your.email@example.org] [-a]
+                                              [--taxdump /path/to/taxdump.tar.gz] [--acc2taxid /path/to/nucl_gb.accession2taxid.gz] [--dead-acc2taxid /path/to/dead_nucl.accession2taxid.gz]
+
+Download DNA sequence from NCBI and add taxonomy for QIIME2.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -q "txid4762[Organism:exp] AND ("internal transcribed spacer"[Title]) NOT uncultured[Title]", --query "txid4762[Organism:exp] AND ("internal transcribed spacer"[Title]) NOT uncultured[Title]"
+                        NCBI query string OR a text file with one accession number per line. Mandatory.
+  -o /output_folder/, --output /output_folder/
+                        Output folder. Mandatory.
+  -t 4, --threads 4     Number of CPU. Default is 4. Optional.
+  -e your.email@example.org, --email your.email@example.org
+                        Your email address. Optional.
+  -a , --api-key        Your NCBI API key. Allows up to 10 requests per second instead of 3. Optional.
+  --taxdump /path/to/taxdump.tar.gz
+                        Path to downloaded taxdump.tar.gz. Optional.
+  --acc2taxid /path/to/nucl_gb.accession2taxid.gz
+                        Path to downloaded nucl_gb.accession2taxid.gz. Optional.
+  --dead-acc2taxid /path/to/dead_nucl.accession2taxid.gz
+                        Path to downloaded dead_nucl.accession2taxid.gz. Optional.
+```
+## Usage - train_unite_classifier_qiime2.py
+```commandline
+usage: python train_unite_classifier_qiime2.py [-h] -u http://www.fileserver.com/file.txt -o /unite_folder/ -q qiime2-2020.8 [-t 16]
+
+Train Unite classifier for QIIME2
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -u http://www.fileserver.com/file.txt, --url http://www.fileserver.com/file.txt
+                        URL of UNITE QIIME2 database (compressed tar file with sequences and taxonomy) OR the path the the file already downloaded. Mandatory.
+  -o /unite_folder/, --output_folder /unite_folder/
+                        Output folder for classifier. Mandatory.
+  -q qiime2-2020.8, --qiime2 qiime2-2020.8
+                        Name of your QIIME2 conda environment. Mandatory.
+  -t 16, --threads 16   Number of CPU. Default is 16
+
 ```

@@ -8,6 +8,10 @@ from qiime2_methods import Qiime2Methods
 from collections import defaultdict
 
 
+__author__ = 'duceppemo'
+__version__ = '0.1.2'
+
+
 class Qiime2(object):
     def __init__(self, args):
         self.args = args

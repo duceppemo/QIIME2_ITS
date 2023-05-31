@@ -10,6 +10,10 @@ from multiprocessing import cpu_count
 from qiime2_methods import Qiime2Methods
 
 
+__author__ = 'duceppemo'
+__version__ = '0.1'
+
+
 class Qiime2Trainer(object):
     def __init__(self, args):
         self.args = args
@@ -24,8 +28,15 @@ class Qiime2Trainer(object):
     def run(self):
         self.checks()
         tmp_file = self.output_folder + '/tmp.tar.gz'
-        print('Downloading UNITE databse')
-        Qiime2Trainer.download(self.url, tmp_file)
+
+        if os.path.exists(self.url) and os.path.isfile(self.url):
+            tmp_file = self.url
+        else:
+            print('Downloading UNITE database')
+            Qiime2Trainer.download(self.url, tmp_file)
+
+        # Uncompress DB
+        print('Extracting database...')
         (unite_seq, unite_taxo) = Qiime2Trainer.untargz(tmp_file)  # tuple
         unite_seq_fixed = '.'.join(unite_seq.split('.')[:-1]) + '_upper.fasta'
         print('Proofreading database...')
@@ -87,7 +98,7 @@ class Qiime2Trainer(object):
         """
         output_path = os.path.dirname(targz_file)
 
-        if targz_file.endswith('.tar.gz'):
+        if targz_file.endswith(tuple(['.tar.gz', '.tgz'])):
             with tarfile.open(targz_file, "r:gz") as f:  # Open for reading with gzip compression
                 f.extractall(path=output_path)
 
@@ -178,18 +189,16 @@ if __name__ == '__main__':
     parser.add_argument('-u', '--url', metavar='http://www.fileserver.com/file.txt',
                         required=True,
                         type=str,
-                        help='URL of UNITE database (compressed tar file with sequences and taxonomy)'
-                             'Mandatory.')
+                        help='URL of UNITE QIIME2 database (compressed tar file with sequences and taxonomy) OR the path the '
+                             'the file already downloaded. Mandatory.')
     parser.add_argument('-o', '--output_folder', metavar='/unite_folder/',
                         required=True,
                         type=str,
-                        help='Output folder for classifier.'
-                             'Mandatory.')
+                        help='Output folder for classifier. Mandatory.')
     parser.add_argument('-q', '--qiime2', metavar='qiime2-2020.8',
                         required=True,
                         type=str,
-                        help='Name of your QIIME2 conda environment'
-                             'Mandatory.')
+                        help='Name of your QIIME2 conda environment. Mandatory.')
     parser.add_argument('-t', '--threads', metavar='{}'.format(cpu),
                         required=False, default=cpu,
                         type=int,
