@@ -232,12 +232,7 @@ class DbBuilder(object):
         self.query = args.query
         self.id_table = args.id_table
         self.output_folder = args.output
-        self.cpu = args.threads
-        self.email = args.email
-        self.api = args.api_key
         self.taxdump = args.taxdump
-        self.acc2taxid = args.acc2taxid
-        self.dead_acc2taxid = args.dead_acc2taxid
 
         # Run
         self.run()
@@ -319,7 +314,7 @@ class DbBuilder(object):
 
 if __name__ == '__main__':
 
-    parser = ArgumentParser(description='Prep a QIIME2 classifier from a fasta file.')
+    parser = ArgumentParser(description='Prep a QIIME2 classifier from a fasta file and corresponding "acc to taxid" table.')
     parser.add_argument('-q', '--query', metavar='my_sequences.fasta',
                         required=True,
                         type=str,
@@ -327,36 +322,17 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--id-table', metavar='/path/to/acc2taxid_table.tsv',
                         required=True,
                         type=str,
-                        help='Tab-separated text file with 2 columns (accession + taxid) matching your input fasta. Mandatory.')
-    parser.add_argument('-o', '--output', metavar='/output_folder/',
+                        help='Tab-separated text file with 2 columns (accession + taxid) matching your input fasta. '
+                             'The accession numbers (i.e. everything befor the first whitespace in the header of sequencers, '
+                             'must match exactly between the fasta and the table.Mandatory.')
+    parser.add_argument('-o', '--output', metavar='/path/to/output_folder/',
                         required=True,
                         type=str,
                         help='Output folder. Mandatory.')
-    parser.add_argument('-t', '--threads', metavar='4',
-                        required=False, default=4,
-                        type=int,
-                        help='Number of CPU. Default is 4. Optional.')
-    parser.add_argument('-e', '--email', metavar='your.email@example.org',
-                        required=False, default='\'your.email@example.org\'',
-                        type=str,
-                        help='Your email address. Optional.')
-    parser.add_argument('-a', '--api-key', metavar='',
-                        required=False,
-                        type=str,
-                        help='Your NCBI API key. Allows up to 10 requests per second instead of 3. Optional.')
     parser.add_argument('--taxdump', metavar='/path/to/taxdump.tar.gz',
                         required=False,
                         type=str,
-                        help='Path to downloaded taxdump.tar.gz. Optional.')
-    parser.add_argument('--acc2taxid', metavar='/path/to/nucl_gb.accession2taxid.gz',
-                        required=False,
-                        type=str,
-                        help='Path to downloaded nucl_gb.accession2taxid.gz. Optional.')
-    parser.add_argument('--dead-acc2taxid', metavar='/path/to/dead_nucl.accession2taxid.gz',
-                        required=False,
-                        type=str,
-                        help='Path to downloaded dead_nucl.accession2taxid.gz. Optional.')
-
+                        help='Path to downloaded taxdump.tar.gz. Will be downloaded otherwise. Optional.')
 
     # Get the arguments into an object
     arguments = parser.parse_args()

@@ -29,9 +29,9 @@ Lastly, I only had access to limited data sets to write this pipeline. It's quit
 
 1. Make sure you have conda installed. See https://docs.conda.io/en/latest/miniconda.html for `miniconda` installation instructions. You may prefer to install `anaconda`. `mamba` can also be installed afterward to speedup environment creation and package installation.
 
-2. Install `qiime2`. See https://docs.qiime2.org/2021.2/install/native/#install-qiime-2-within-a-conda-environment for instructions.
+2. Install `qiime2`. See https://docs.qiime2.org/2021.2/install/native/#install-qiime-2-within-a-conda-environment for instructions. If you're using a newer version, make sure to install the "QIIME 2 Amplicon Distribution" and follow the updated instructions for "Install QIIME 2 within a `conda` environment"
 3. Run the following command lines:
-```
+```bash
 # Activate qiime2 conda environment
 conda activate qiime2-2021.2  # Version number may differ depending of time of installation.
 
@@ -51,7 +51,7 @@ python qiime2_its.py -h
 In order to use this pipeline, you have to have a qiime2 classifier available. Note that if you update your QIIME2 version, you might need to recompile the classifier.
 
 Here are the instruction to build the UNITE qiime2 classifier using the included helper script `train_unite_classifier_qiime2.py`. Use `python train_unite_classifier_qiime2.py -h` for more options.
-```
+```bash
 # QIIME files for unite are located at https://unite.ut.ee/repository.php under the "QIIME release" drop down menu.
 # Replace the url ("-u"), the datase location ("-o") and the qiime2 ("-q") to suit your installation. If you have
 # already downloaded the QIIME release file, you can substitute the URL with the actual ".tgz" file.
@@ -70,9 +70,8 @@ python train_unite_classifier_qiime2.py \
     -o '/db/UNITE' \
     -q qiime2-2021.2
 ```
-
 Here's how to build a classifier with sequences hosted on GenBank with the script `train_ncbi_classifier_qiime2.py`. That script takes care of downloading the sequences, the taxonomy and train the QIIME2 classifier. It takes as input a NCBI query input or a text file with one accession number per line. It is strongly recommended testing your query string on NCBI's website first to make sure you get the right sequences. Use `python train_ncbi_classifier_qiime2.py -h` for more options.  
-```
+```bash
 # Using query string:
 python train_ncbi_classifier_qiime2.py \
     -q "txid4762[Organism:exp] AND (\"internal transcribed spacer\"[Title]) NOT uncultured[Title]" \
@@ -87,9 +86,11 @@ python train_ncbi_classifier_qiime2.py \
     -t 48 \
     -o /oomycetes_DB \
 ```
+ere's how to build a classifier with sequences hosted on GenBank with the script `train_fasta_classifier_qiime2.py`. You need to supply your own fasta file and "Accession to taxid" table. The script will expand the taxonomy and train the QIIME2 classifier. Use `python train_fasta_classifier_qiime2.py -h` for more options.  
+
 ## Usage - qiime2.py
 Don't forget to activate your environment, if not already done.
-```
+```commandline
 usage: python qiime2_its.py [-h] -q qiime2-2020.8 -i /input_folder/ -o /output_folder/ -m qiime2_metadata.tsv -c unite_classifier_qiime2.qza [-t 4] [-p 1] [-rc] [--min-len MIN_LEN] [--max-len MAX_LEN] [-se] [-pe]
                             [--extract-its1] [--extract-its2] [--taxa Fungi]
 
@@ -164,4 +165,22 @@ optional arguments:
                         Name of your QIIME2 conda environment. Mandatory.
   -t 16, --threads 16   Number of CPU. Default is 16
 
+```
+## Usage - train_fasta_classifier_qiime2.py
+```commandline
+usage: python train_fasta_classifier_qiime2.py [-h] -q my_sequences.fasta -i /path/to/acc2taxid_table.tsv -o /path/to/output_folder/ [--taxdump /path/to/taxdump.tar.gz]
+
+Prep a QIIME2 classifier from a fasta file and corresponding "acc to taxid" table.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -q my_sequences.fasta, --query my_sequences.fasta
+                        A fasta file. Mandatory.
+  -i /path/to/acc2taxid_table.tsv, --id-table /path/to/acc2taxid_table.tsv
+                        Tab-separated text file with 2 columns (accession + taxid) matching your input fasta. The accession numbers (i.e. everything befor the first whitespace in the header of sequencers, must match
+                        exactly between the fasta and the table.Mandatory.
+  -o /path/to/output_folder/, --output /path/to/output_folder/
+                        Output folder. Mandatory.
+  --taxdump /path/to/taxdump.tar.gz
+                        Path to downloaded taxdump.tar.gz. Will be downloaded otherwise. Optional.
 ```
