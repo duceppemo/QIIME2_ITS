@@ -1,0 +1,250 @@
+"""Main ITS pipeline: import -> (optional) ITSxpress trim -> (optional) size
+filter -> DADA2 denoise -> phylogeny -> diversity -> taxonomy -> barplot.
+"""
+import argparse
+from pathlib import Path
+
+from qiime2_its import biom_utils, env_checks, fastq_utils, itsxpress_wrapper, qiime_wrapper, size_filter
+from qiime2_its._version import __version__
+from qiime2_its.itsxpress_wrapper import TAXA_CODES
+
+
+class Pipeline:
+    def __init__(self, args):
+        self.input_folder = Path(args.input)
+        self.qiime2_classifier = args.classifier
+        self.metadata_file = args.metadata
+
+        self.single = args.se
+        self.paired = args.pe
+
+        self.output_folder = Path(args.output)
+
+        self.cpu = env_checks.clamp_cpu(args.threads)
+        self.parallel = env_checks.clamp_parallel(args.parallel_processes, self.cpu)
+
+        self.qiime2_env = args.qiime2
+
+        self.reverse_complement = args.reverse_complement
+        self.min_len = args.min_len
+        self.max_len = args.max_len
+
+        self.its1 = args.extract_its1
+        self.its2 = args.extract_its2
+        self.taxa = args.taxa
+        self.region = 'ITS1' if self.its1 else 'ITS2' if self.its2 else None
+
+        self.fastq_list = []
+        self.sample_dict = {}
+
+        self.run()
+
+    def run(self):
+        self.fastq_list = fastq_utils.list_fastq(self.input_folder)
+        self.checks()
+        self.sample_dict = fastq_utils.parse_fastq_list(self.fastq_list)
+        self.output_folder.mkdir(parents=True, exist_ok=True)
+
+        input_folder = self.input_folder
+        if self.reverse_complement:
+            print('Reverse complementing reads...')
+            rc_folder = self.output_folder / 'rc_reads'
+            rc_folder.mkdir(parents=True, exist_ok=True)
+            fastq_utils.rc_fastq_parallel(self.fastq_list, rc_folder, self.parallel)
+            input_folder = rc_folder
+            self.fastq_list = fastq_utils.list_fastq(rc_folder)
+
+        demux_qza = self.output_folder / 'demux-seqs.qza'
+        needs_fastq_roundtrip = bool(self.its1 or self.its2) or self.min_len > 0 or self.max_len > 0
+
+        if not needs_fastq_roundtrip:
+            print('Importing data into QIIME2...')
+            self._import(input_folder, demux_qza)
+        else:
+            self._run_with_roundtrip(input_folder, demux_qza)
+
+        qiime_wrapper.demux_summary(demux_qza, self.output_folder / 'demux-seqs.qzv')
+
+        print('Denoising data with DADA2...')
+        repseq_qza = self.output_folder / 'rep-seqs.qza'
+        table_qza = self.output_folder / 'table.qza'
+        stats_qza = self.output_folder / 'stats.qza'
+        if self.paired:
+            qiime_wrapper.dada2_denoise_paired(demux_qza, repseq_qza, table_qza, stats_qza)
+        else:
+            qiime_wrapper.dada2_denoise_single(demux_qza, repseq_qza, table_qza, stats_qza)
+        qiime_wrapper.metadata_tabulate(stats_qza, self.output_folder / 'stats.qzv')
+
+        print('Exporting BIOM table...')
+        biom_folder = self.output_folder / 'biom_table'
+        qiime_wrapper.export(table_qza, biom_folder)
+
+        print('Summarizing feature table and representative sequences...')
+        qiime_wrapper.sample_summarize(self.metadata_file, table_qza, self.output_folder / 'table.qzv')
+        qiime_wrapper.seq_summary(repseq_qza, self.output_folder / 'rep-seqs.qzv')
+
+        print('Aligning representative sequences and building phylogenetic tree...')
+        aligned_qza = self.output_folder / 'aligned-rep-seqs.qza'
+        masked_qza = self.output_folder / 'masked-aligned-rep-seqs.qza'
+        unrooted_qza = self.output_folder / 'unrooted-tree.qza'
+        rooted_qza = self.output_folder / 'rooted-tree.qza'
+        qiime_wrapper.phylogeny(repseq_qza, aligned_qza, masked_qza, unrooted_qza, rooted_qza)
+        qiime_wrapper.export(unrooted_qza, self.output_folder)
+
+        print('Analyzing alpha and beta diversity...')
+        qiime_wrapper.core_diversity(self.cpu, self.metadata_file, rooted_qza, table_qza, self.output_folder)
+
+        print('Creating rarefaction plot...')
+        qiime_wrapper.rarefaction(self.metadata_file, rooted_qza, table_qza,
+                                   self.output_folder / 'alpha-rarefaction.qzv')
+
+        print('Assigning taxonomy to representative sequences...')
+        taxonomy_qza = self.output_folder / 'taxonomy.qza'
+        qiime_wrapper.classify(self.qiime2_classifier, repseq_qza, taxonomy_qza)
+        qiime_wrapper.metadata_tabulate(taxonomy_qza, self.output_folder / 'taxonomy.qzv')
+
+        print('Exporting taxonomy...')
+        qiime_wrapper.export(taxonomy_qza, biom_folder)
+
+        print('Incorporating taxonomy into BIOM table...')
+        taxonomy_tsv = biom_folder / 'taxonomy.tsv'
+        biom_utils.rewrite_taxonomy_header(taxonomy_tsv)
+        feature_table_biom = biom_folder / 'feature-table.biom'
+        table_with_taxonomy_biom = biom_folder / 'table-with-taxonomy.biom'
+        biom_utils.add_metadata(feature_table_biom, taxonomy_tsv, table_with_taxonomy_biom)
+
+        print('Exporting BIOM table with taxonomy...')
+        biom_utils.convert_to_tsv(table_with_taxonomy_biom, taxonomy_tsv,
+                                   self.output_folder / 'biom_table' / 'table-with-taxonomy.biom.tsv')
+
+        print('Creating bar plot of sample composition...')
+        qiime_wrapper.taxa_barplot(table_qza, taxonomy_qza, self.metadata_file,
+                                    self.output_folder / 'taxa-bar-plots.qzv')
+
+        print('DONE!')
+
+    def _import(self, fastq_folder, output_qza):
+        if self.paired:
+            qiime_wrapper.import_fastq_pe(fastq_folder, output_qza)
+        else:
+            qiime_wrapper.import_fastq_se(fastq_folder, output_qza)
+
+    def _run_with_roundtrip(self, input_folder, demux_qza):
+        """ITS extraction and/or size filtering: both require dropping back to
+        fastq (ITSxpress runs on a qza; BBDuk size filtering does not), so this
+        path imports once, optionally trims via ITSxpress, exports, optionally
+        cleans/size-filters, then re-imports the final reads as `demux_qza`.
+        """
+        print('Importing data into QIIME2...')
+        raw_qza = self.output_folder / 'raw-demux-seqs.qza'
+        self._import(input_folder, raw_qza)
+        current_qza = raw_qza
+
+        if self.its1 or self.its2:
+            print('Extracting ITS region with ITSxpress...')
+            its_qza = self.output_folder / 'its-demux-seqs.qza'
+            if self.paired:
+                itsxpress_wrapper.trim_pair_unmerged(current_qza, its_qza, self.region, self.taxa,
+                                                      threads=self.cpu)
+            else:
+                itsxpress_wrapper.trim_single(current_qza, its_qza, self.region, self.taxa, threads=self.cpu)
+            current_qza = its_qza
+
+        print('Exporting reads for post-processing...')
+        export_folder = self.output_folder / 'exported_reads'
+        qiime_wrapper.export(current_qza, export_folder)
+        exported_fastq = fastq_utils.list_fastq(export_folder)
+
+        if self.its1 or self.its2:
+            print('Checking for empty entries...')
+            if self.single:
+                fastq_utils.remove_empties_se_parallel(exported_fastq, self.parallel)
+            else:
+                exported_sample_dict = fastq_utils.parse_fastq_list(exported_fastq)
+                fastq_utils.remove_empties_pe_parallel(exported_sample_dict, self.parallel)
+
+        reimport_folder = export_folder
+        if self.min_len > 0 or self.max_len > 0:
+            print('Filtering reads based on size...')
+            size_folder = self.output_folder / 'size_filtered'
+            size_folder.mkdir(parents=True, exist_ok=True)
+            if self.single:
+                size_filter.size_select_se_parallel(exported_fastq, size_folder, self.min_len, self.max_len,
+                                                     self.cpu, self.parallel)
+            else:
+                exported_sample_dict = fastq_utils.parse_fastq_list(exported_fastq)
+                size_filter.size_select_pe_parallel(exported_sample_dict, size_folder, self.min_len,
+                                                     self.max_len, self.cpu, self.parallel)
+            reimport_folder = size_folder
+
+        print('Re-importing processed reads into QIIME2...')
+        self._import(reimport_folder, demux_qza)
+
+    def checks(self):
+        if not (self.paired or self.single):
+            raise ValueError('You must state if reads are single-end or paired-end ("-se" or "-pe").')
+
+        if not self.fastq_list:
+            raise ValueError('No fastq files found in the provided input folder.')
+
+        fastq_utils.validate_casava_filenames(self.fastq_list)
+
+        env_checks.check_qiime2_env_active()
+
+        if self.its1 and self.its2:
+            raise ValueError('You cannot choose both ITS1 and ITS2 for the same analysis.')
+
+        if (self.its1 or self.its2) and self.taxa not in TAXA_CODES:
+            raise ValueError(f'--taxa must be one of: {", ".join(sorted(TAXA_CODES))}.')
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description='Run QIIME2 on ITS amplicon data using ITSxpress and DADA2')
+    parser.add_argument('-q', '--qiime2', metavar='rachis-qiime2-2026.7', required=True, type=str,
+                         help='Name of your QIIME2 conda environment. Mandatory.')
+    parser.add_argument('-i', '--input', metavar='/input_folder/', required=True, type=str,
+                         help='Input folder where the fastq reads are located. Mandatory.')
+    parser.add_argument('-o', '--output', metavar='/output_folder/', required=True, type=str,
+                         help='Output folder for QIIME2 files. Mandatory.')
+    parser.add_argument('-m', '--metadata', metavar='qiime2_metadata.tsv', required=True, type=str,
+                         help='Validated QIIME2 metadata file (samples description). Mandatory.')
+    parser.add_argument('-c', '--classifier', metavar='unite_classifier_qiime2.qza', required=True, type=str,
+                         help='Classifier for QIIME2. See "qiime2-its-train-unite" to compile one. Mandatory.')
+    parser.add_argument('-t', '--threads', metavar='4', default=4, type=int,
+                         help='Number of CPUs. Default is 4.')
+    parser.add_argument('-p', '--parallel-processes', metavar='1', default=1, type=int,
+                         help='Samples to process in parallel. For example, with 16 threads, using 4 '
+                              'parallel processes will run 4 samples in parallel using 4 threads each. '
+                              'Default is 1.')
+    parser.add_argument('-rc', '--reverse_complement', action='store_true',
+                         help='Use this flag if your reads are in reverse complement, for example if you '
+                              'sequenced from 5.8S to 18S. Optional.')
+    parser.add_argument('--min-len', type=int, default=0,
+                         help='Minimum read length to keep. Default is 0 (no minimum).')
+    parser.add_argument('--max-len', type=int, default=0,
+                         help='Maximum read length to keep. Default is 0 (no maximum).')
+
+    read_type = parser.add_mutually_exclusive_group(required=True)
+    read_type.add_argument('-se', action='store_true', help='Reads are single-end (one fastq file per sample).')
+    read_type.add_argument('-pe', action='store_true', help='Reads are paired-end (two fastq files per sample).')
+
+    its_region = parser.add_mutually_exclusive_group()
+    its_region.add_argument('--extract-its1', action='store_true',
+                             help='Extract the ITS1 region with ITSxpress. Cannot be used with --extract-its2.')
+    its_region.add_argument('--extract-its2', action='store_true',
+                             help='Extract the ITS2 region with ITSxpress. Cannot be used with --extract-its1.')
+
+    parser.add_argument('--taxa', metavar='Fungi', default='Fungi', choices=sorted(TAXA_CODES),
+                         help='Taxon of interest for ITSxpress. One of: ' + ', '.join(sorted(TAXA_CODES)))
+    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    Pipeline(args)
+
+
+if __name__ == '__main__':
+    main()
