@@ -44,6 +44,33 @@ _REAL_BBDUK_VERSION_TEXT = (
 )
 
 
+class TestFormatCommandLine:
+    def test_one_flag_and_value_per_line(self):
+        argv = ['qiime2-its', '-q', 'rachis-qiime2-2026.7', '-i', 'in', '-o', 'out',
+                '-m', 'meta.tsv', '-c', 'clf.qza', '-pe', '--extract-its2', '--taxa', 'Fungi']
+        assert provenance.format_command_line(argv) == (
+            'qiime2-its \\\n'
+            '    -q rachis-qiime2-2026.7 \\\n'
+            '    -i in \\\n'
+            '    -o out \\\n'
+            '    -m meta.tsv \\\n'
+            '    -c clf.qza \\\n'
+            '    -pe \\\n'
+            '    --extract-its2 \\\n'
+            '    --taxa Fungi'
+        )
+
+    def test_program_only(self):
+        assert provenance.format_command_line(['qiime2-its']) == 'qiime2-its'
+
+    def test_empty_argv(self):
+        assert provenance.format_command_line([]) == ''
+
+    def test_quotes_values_needing_it(self):
+        result = provenance.format_command_line(['qiime2-its', '-m', 'a file with spaces.tsv'])
+        assert "'a file with spaces.tsv'" in result
+
+
 class TestParseBbdukVersion:
     def test_extracts_version_number(self):
         assert provenance.parse_bbduk_version(_REAL_BBDUK_VERSION_TEXT) == '39.80'

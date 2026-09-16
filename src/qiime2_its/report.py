@@ -105,11 +105,18 @@ class _ReportPDF(FPDF):
         self.add_page()
         self.section_title(title)
         for label, value in rows:
+            value = str(value)
             self.set_font('Helvetica', 'B', 9)
             self.set_x(self.l_margin)
             self.cell(label_width, 6, f'{label}:', new_x='RIGHT', new_y='TOP')
-            self.set_font('Helvetica', '', 9)
-            self.multi_cell(0, 6, str(value))
+            # A value with embedded newlines (e.g. the multi-line "Command
+            # invoked") reads better as a monospaced block than justified
+            # proportional text.
+            if '\n' in value:
+                self.set_font('Courier', '', 8)
+            else:
+                self.set_font('Helvetica', '', 9)
+            self.multi_cell(0, 6, value)
 
     def add_figure_page(self, title, fig, width=180):
         self.add_page()

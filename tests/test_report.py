@@ -156,7 +156,8 @@ class TestFitCellText:
 _SAMPLE_RUN_METADATA = {
     'pipeline': {
         'qiime2_its_version': '0.2.0',
-        'command_line': 'qiime2-its -q rachis-qiime2-2026.7 -i in -o out -m meta.tsv -c clf.qza -pe',
+        'command_line': 'qiime2-its \\\n    -q rachis-qiime2-2026.7 \\\n    -i in \\\n    -o out \\\n'
+                        '    -m meta.tsv \\\n    -c clf.qza \\\n    -pe',
         'start_time': '2026-09-16T12:00:00+00:00',
         'end_time': '2026-09-16T12:02:30+00:00',
         'duration_seconds': 150.0,

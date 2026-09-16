@@ -5,7 +5,6 @@ filter -> DADA2 denoise -> phylogeny -> diversity -> taxonomy -> barplot ->
 import argparse
 import getpass
 import platform
-import shlex
 import socket
 import subprocess
 import sys
@@ -272,7 +271,7 @@ class Pipeline:
         """
         run_metadata = provenance.build_run_metadata(
             qiime2_its_version=__version__,
-            command_line=shlex.join(sys.argv),
+            command_line=provenance.format_command_line(sys.argv),
             start_time=self.start_time,
             end_time=datetime.now().astimezone(),
             username=getpass.getuser(),

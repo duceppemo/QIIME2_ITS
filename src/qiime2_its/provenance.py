@@ -12,10 +12,38 @@ qiime_wrapper.py, which just hands this module the raw text to parse.
 """
 import json
 import re
+import shlex
 from pathlib import Path
 
 _QIIME_INFO_SECTION_HEADERS = {'System versions': 'system', 'Installed plugins': 'plugins'}
 _BBDUK_VERSION_RE = re.compile(r'BBTools version (\S+)')
+
+
+def format_command_line(argv):
+    """Format `sys.argv` as a readable, multi-line shell invocation, one
+    flag (and its value, if any) per line -- e.g.:
+
+        qiime2-its \\
+            -q rachis-qiime2-2026.7 \\
+            -i /path/to/input \\
+            -pe
+
+    A single `shlex.join(argv)`-style line reads fine on a terminal but
+    wraps illegibly once it's justified inside a report table cell.
+    """
+    if not argv:
+        return ''
+    program, *args = argv
+    lines = [shlex.quote(program)]
+    current = []
+    for arg in args:
+        if arg.startswith('-') and current:
+            lines.append(' '.join(current))
+            current = []
+        current.append(shlex.quote(arg))
+    if current:
+        lines.append(' '.join(current))
+    return ' \\\n    '.join(lines)
 
 
 def parse_qiime_info(text):
