@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="QIIME2_ITS logo" width="120">
+  <img src="docs/QIIME2_ITS_logo.png" alt="QIIME2_ITS logo" width="140">
 </p>
 
 <h1 align="center">QIIME2_ITS</h1>

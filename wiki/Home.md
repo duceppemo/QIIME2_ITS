@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/duceppemo/QIIME2_ITS/master/docs/QIIME2_ITS_logo.png" alt="QIIME2_ITS logo" width="160">
+</p>
+
 # QIIME2_ITS wiki
 
 QIIME2 pipeline for single-end (IonTorrent) and paired-end (Illumina) ITS metabarcoding data. Uses

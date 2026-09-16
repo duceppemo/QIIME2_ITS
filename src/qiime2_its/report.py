@@ -7,6 +7,7 @@ sample-classifier accuracy summary if any column was successfully modeled.
 Pure PDF assembly -- all the parsing this depends on lives in report_data.py
 so it can be unit-tested without matplotlib/fpdf2 involved.
 """
+import importlib.resources
 import io
 from pathlib import Path
 
@@ -27,14 +28,26 @@ def _fig_to_png_bytes(fig):
     return buf
 
 
+def _logo_bytes():
+    try:
+        data = importlib.resources.files('qiime2_its').joinpath('assets/logo.png').read_bytes()
+    except (FileNotFoundError, ModuleNotFoundError):
+        return None
+    return io.BytesIO(data)
+
+
 class _ReportPDF(FPDF):
     def section_title(self, title):
         self.set_font('Helvetica', 'B', 14)
         self.cell(0, 10, title, new_x='LMARGIN', new_y='NEXT')
         self.ln(1)
 
-    def add_title_page(self, title, lines):
+    def add_title_page(self, title, lines, logo=None):
         self.add_page()
+        if logo is not None:
+            logo_width = 28
+            self.image(logo, x=(self.w - logo_width) / 2, w=logo_width)
+            self.ln(4)
         self.set_font('Helvetica', 'B', 20)
         self.cell(0, 14, title, new_x='LMARGIN', new_y='NEXT')
         self.ln(6)
@@ -182,7 +195,7 @@ def build_report(output_folder, metadata_file, report_column=None):
         df, _header, _rows = dada2
         if 'non-chimeric' in df.columns:
             summary_lines.append(f'Median non-chimeric reads/sample: {df["non-chimeric"].median():.0f}')
-    pdf.add_title_page('QIIME2-ITS run summary', summary_lines)
+    pdf.add_title_page('QIIME2-ITS run summary', summary_lines, logo=_logo_bytes())
 
     # 2. DADA2 retention table
     if dada2 is not None:
