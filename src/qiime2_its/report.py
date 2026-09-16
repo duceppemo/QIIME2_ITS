@@ -45,7 +45,7 @@ class _ReportPDF(FPDF):
     def add_title_page(self, title, lines, logo=None):
         self.add_page()
         if logo is not None:
-            logo_width = 28
+            logo_width = 56
             self.image(logo, x=(self.w - logo_width) / 2, w=logo_width)
             self.ln(4)
         self.set_font('Helvetica', 'B', 20)

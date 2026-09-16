@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/duceppemo/QIIME2_ITS/master/docs/QIIME2_ITS_logo.png" alt="QIIME2_ITS logo" width="160">
+  <img src="https://raw.githubusercontent.com/duceppemo/QIIME2_ITS/master/docs/QIIME2_ITS_logo.png" alt="QIIME2_ITS logo" width="320">
 </p>
 
 # QIIME2_ITS wiki
