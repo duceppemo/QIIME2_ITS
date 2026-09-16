@@ -1,0 +1,61 @@
+# Advanced stats and the PDF report
+
+By default, after the core pipeline (import → ITSxpress → DADA2 → phylogeny → diversity →
+taxonomy → barplot), `qiime2-its` also runs:
+
+1. **Alpha diversity group significance** (`qiime diversity alpha-group-significance`, Kruskal-Wallis)
+   for each of Faith's PD, observed features, Shannon, and evenness — but only if the metadata file
+   has at least one categorical column with a repeated (not all-unique) and varying (not all-same)
+   value; otherwise it's skipped with a message, since the action itself fails outright for the
+   whole metadata file rather than degrading per-column.
+2. **Beta diversity group significance** (`qiime diversity beta-group-significance`, PERMANOVA)
+   against Bray-Curtis and unweighted UniFrac, for every "eligible" categorical metadata column: ≥2
+   distinct values, each held by ≥2 samples.
+3. **Genus-level composition**: `qiime taxa collapse` (capped to whatever taxonomic depth the
+   classifier actually resolved for this dataset — a classifier commonly won't reach genus for
+   reads unrelated to its training set, and requesting a deeper level than that fails outright) +
+   `qiime feature-table relative-frequency`.
+4. **Sample classification** (`qiime sample-classifier classify-samples`, random forest) for each
+   eligible column, with cross-validation folds capped to the smallest class size. A column that's
+   nominally eligible but still too small for scikit-learn's internal stratified split (e.g. one
+   category has only one non-zero-read sample) is caught and skipped with a message, not fatal to
+   the run.
+5. **A PDF report** (`<output>/report.pdf`): run summary, DADA2 read retention table, alpha
+   diversity group-significance table + boxplots, beta diversity group-significance table + PCoA
+   plots (Bray-Curtis and unweighted UniFrac), genus-level relative-abundance chart, the
+   rarefaction curve, and sample-classifier accuracy (if any column succeeded). Built with
+   matplotlib + [fpdf2](https://pypi.org/project/fpdf2/) — no LaTeX, no browser rendering, no
+   heavy system dependencies. It discovers what to include by scanning the output folder for
+   whichever of the artifacts above were actually produced, so it degrades gracefully if you pass
+   `--skip-advanced-stats`.
+
+## A near-empty sample
+
+A sample that DADA2 reduces to a zero-read row (its input was low enough that nothing survives
+denoising/chimera removal) still exists in the metadata file, but is excluded from all of the
+eligibility checks above via the sample-frequency export QIIME2 itself produces
+(`sample-frequencies.qza`) — otherwise a metadata column that looks balanced on paper (e.g. 2
+samples per site) can turn out to have an effectively-singleton group once the zero-read sample is
+accounted for, which breaks `classify-samples`'s internal stratification even though the column
+passed the simpler ≥2-per-group eligibility check.
+
+## Turning it off
+
+```bash
+qiime2-its ... --skip-advanced-stats --skip-report
+```
+`--skip-advanced-stats` skips steps 1–4 above; `--skip-report` skips just the PDF (useful if you
+want the group-significance/classifier artifacts but not the report, or vice versa).
+
+## Output layout
+
+```
+<output>/
+  alpha-group-significance-<metric>.qzv          # one per alpha metric tested
+  beta-group-significance-<column>-<metric>.qzv  # one per (eligible column, distance metric)
+  table-genus.qza, table-genus-relative.qza
+  sample-classifier-<column>/                    # one per eligible, non-skipped column
+  dada2_stats/, sample_frequencies/               # plain-text exports the report reads
+  core-metrics-results/<metric>_pcoa_export/      # plain-text PCoA exports the report reads
+  report.pdf
+```
