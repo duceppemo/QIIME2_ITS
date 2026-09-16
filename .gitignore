@@ -8,3 +8,4 @@ htmlcov/
 venv/
 build/
 dist/
+validation/output/

@@ -1,0 +1,15 @@
+Downloading 20 records...
+	Downloading record 1 to 20 (20)
+Downloading taxdump.tar.gz... took 7s
+Extracting accession numbers from fasta file... took 0s
+Parsing nucl_gb.accession2taxid.gz... took 0s
+Parsing dead_nucl.accession2taxid.gz... took 0s
+Finding taxID for accessions... took 0s
+Writing taxonomy...Imported /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier/seq.fasta as DNASequencesDirectoryFormat to /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier/seq.fasta.qza
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier/taxonomy.txt as HeaderlessTSVTaxonomyFormat to /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier/taxonomy.txt.qza
+Saved TaxonomicClassifier to: /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier/seq_ncbi.qza
+ took 6s
+Importing sequences into QIIME2...
+Importing taxonomy into QIIME2...
+Training classifier...
+Done (total time: 1m11s).
