@@ -31,7 +31,23 @@ only the above 20 accessions, in the same format as NCBI's `nucl_gb.accession2ta
 in under two minutes without a multi-GB download. `dead_acc2taxid.tsv` is just a header row: none
 of the chosen accessions are dead/merged.
 
+`seqs.fasta`, `id_table.tsv`: the same 20 accessions/taxids, exported to the fasta + 2-column
+accession/taxid format `qiime2-its-train-fasta` expects, for validating that script's own path
+(a user-supplied fasta + id table, no NCBI download at all).
+
 This is a small, deliberately narrow classifier (4 taxa) meant to validate that the training and
-classification *code paths* work correctly end-to-end -- not to produce biologically meaningful
-taxonomy for the validation reads above (which are not related to these 4 taxa, so classification
-against this classifier is expected to come back "unidentified").
+classification *code paths* work correctly end-to-end, not to produce biologically comprehensive
+taxonomy. Classifying the bundled `paired_end`/`single_end` reads against it (which are unrelated
+to these 4 taxa) correctly truncates at a shallow, high-confidence rank -- typically
+`k__Fungi;p__Ascomycota` -- rather than an empty/"unidentified" result or a wrong species guess:
+that's `classify-sklearn`'s confidence-based rank truncation working as intended when a read has no
+close match in the reference set, and is the expected outcome here.
+
+**Erratum (2026-09-16)**: `acc2taxid.tsv` originally had corrupted taxid values (Biopython's
+`Entrez.esummary` result stringified as `IntegerElement(559292, attributes={})` instead of `559292`
+in the one-off script used to build this file) that made every scenario using this classifier
+produce all-"unidentified" taxonomy -- a symptom that was misdiagnosed as the expected outcome of a
+narrow classifier in `results/2026-09-15_qiime2-2026.7/SUMMARY.md`. The file has since been
+corrected; see `results/2026-09-16_qiime2-2026.7/SUMMARY.md` for the re-verified results. This also
+surfaced a real, separate bug in `qiime2_its.taxonomy`'s NCBI-rank-to-QIIME2-code mapping, fixed in
+the same pass (see that SUMMARY.md for details).

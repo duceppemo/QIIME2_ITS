@@ -1,0 +1,61 @@
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/data/paired_end as CasavaOneEightSingleLanePerSampleDirFmt to /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/raw-demux-seqs.qza
+Saved SampleData[PairedEndSequencesWithQuality] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/its-demux-seqs.qza
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/its-demux-seqs.qza as SingleLanePerSamplePairedEndFastqDirFmt to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/exported_reads
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/exported_reads as CasavaOneEightSingleLanePerSampleDirFmt to /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/demux-seqs.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/demux-seqs.qzv
+Saved FeatureTable[Frequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/table.qza
+Saved FeatureData[Sequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/rep-seqs.qza
+Saved SampleData[DADA2Stats] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/stats.qza
+Saved DADA2BaseTransitionStats to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/base-transition-stats.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/stats.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/table.qza as BIOMV210DirFmt to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/biom_table
+Saved ImmutableMetadata to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/feature-frequencies.qza
+Saved ImmutableMetadata to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/sample-frequencies.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/table.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/rep-seqs.qzv
+Saved FeatureData[AlignedSequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/aligned-rep-seqs.qza
+Saved FeatureData[AlignedSequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/masked-aligned-rep-seqs.qza
+Saved Phylogeny[Unrooted] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/unrooted-tree.qza
+Saved Phylogeny[Rooted] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/rooted-tree.qza
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/unrooted-tree.qza as NewickDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end
+Saved FeatureTable[Frequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/rarefied_table.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/faith_pd_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/observed_features_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/shannon_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/evenness_vector.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/unweighted_unifrac_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/weighted_unifrac_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/jaccard_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/bray_curtis_distance_matrix.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/unweighted_unifrac_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/weighted_unifrac_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/jaccard_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/bray_curtis_pcoa_results.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/unweighted_unifrac_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/weighted_unifrac_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/jaccard_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/core-metrics-results/bray_curtis_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/alpha-rarefaction.qzv
+Saved FeatureData[Taxonomy] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/taxonomy.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/taxonomy.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/taxonomy.qza as TSVTaxonomyDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/biom_table
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/paired_end/taxa-bar-plots.qzv
+Importing data into QIIME2...
+Extracting ITS region with ITSxpress...
+Exporting reads for post-processing...
+Checking for empty entries...
+sampleB: input sequences: 119, good: 119, empty: 0
+sampleA: input sequences: 116, good: 116, empty: 0
+Re-importing processed reads into QIIME2...
+Denoising data with DADA2...
+Exporting BIOM table...
+Summarizing feature table and representative sequences...
+Aligning representative sequences and building phylogenetic tree...
+Analyzing alpha and beta diversity...
+Creating rarefaction plot...
+Assigning taxonomy to representative sequences...
+Exporting taxonomy...
+Incorporating taxonomy into BIOM table...
+Exporting BIOM table with taxonomy...
+Creating bar plot of sample composition...
+DONE!

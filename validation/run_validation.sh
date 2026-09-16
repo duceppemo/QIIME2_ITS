@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Runs qiime2-its end-to-end against small, real, bundled fungal ITS datasets
-# (paired-end, single-end, read-length filtering, reverse-complement) to catch
-# QIIME2/ITSxpress interface breaks that the mocked-subprocess unit tests
-# under tests/ cannot -- those check that *our* code builds the right command,
-# not that the command still means the same thing in the QIIME2 version
-# actually installed.
+# Runs qiime2-its and its classifier trainers (train_ncbi, train_fasta) end-to-
+# end against small, real, bundled fungal ITS datasets (paired-end, single-end,
+# read-length filtering, reverse-complement) to catch QIIME2/ITSxpress
+# interface breaks that the mocked-subprocess unit tests under tests/ cannot
+# -- those check that *our* code builds the right command, not that the
+# command still means the same thing in the QIIME2 version actually
+# installed, or that a real taxonomy database produces correct output.
 #
 # Requires: an activated QIIME2 conda environment with this package installed
 # (`pip install -e .` from the repo root) and bbduk.sh (BBTools/BBMap) on
@@ -79,6 +80,14 @@ qiime2-its-train-ncbi \
 
 CLASSIFIER="$OUT/classifier/seq_ncbi.qza"
 
+echo
+echo "== Training a classifier from a fasta + id-table (train_fasta) =="
+qiime2-its-train-fasta \
+    -q "$DATA/classifier_training/seqs.fasta" \
+    -i "$DATA/classifier_training/id_table.tsv" \
+    -o "$OUT/classifier_fasta" \
+    2>&1 | tee "$OUT/train_fasta.log"
+
 run_case () {
     local name="$1"; shift
     echo
@@ -111,6 +120,16 @@ run_case paired_end_size_filter \
 run_case single_end_reverse_complement \
     -i "$DATA/single_end" -o "$OUT/single_end_reverse_complement" -se -rc --taxa Fungi \
     --max-ee 4 --sampling-depth 5 --max-rarefaction-depth 30
+
+# Swap in the fasta-trained classifier for this one case, to confirm it
+# actually classifies (not just that training didn't crash), then restore
+# the NCBI one for anything run afterward.
+saved_classifier="$CLASSIFIER"
+CLASSIFIER="$OUT/classifier_fasta/naive-bayes_classifier.qza"
+run_case fasta_classifier_classification \
+    -i "$DATA/single_end" -o "$OUT/fasta_classifier_pipeline" -se --extract-its2 --taxa Fungi \
+    --max-ee 4 --allow-one-off --sampling-depth 10 --max-rarefaction-depth 60
+CLASSIFIER="$saved_classifier"
 
 run_unite_scenario () {
     # UNITE's own site now gates release files behind DOI/PlutoF landing

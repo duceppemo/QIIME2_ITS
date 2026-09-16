@@ -7,8 +7,12 @@ QIIME2 version actually installed still accepts that command. QIIME2's CLI has c
 breaks only show up by actually running the pipeline.
 
 This directory holds small, real (not synthetic) fungal ITS datasets and a script that runs
-`qiime2-its` against them end-to-end, covering:
+`qiime2-its-train-ncbi`, `qiime2-its-train-fasta`, and `qiime2-its` against them end-to-end,
+covering:
 
+- training a classifier from an NCBI accession list (`qiime2-its-train-ncbi`)
+- training a classifier from a fasta + accession/taxid table (`qiime2-its-train-fasta`), then
+  actually classifying real reads with it
 - paired-end reads
 - single-end reads (a stand-in for full-amplicon single-end platforms like IonTorrent)
 - `--min-len`/`--max-len` read-length filtering (paired-end)
@@ -25,12 +29,12 @@ Inside an activated QIIME2 conda environment with this package installed (`pip i
 validation/run_validation.sh
 ```
 
-This trains a small real classifier from bundled NCBI accessions (no multi-GB taxonomy download
-needed -- see `data/SOURCES.md`), then runs all four scenarios above, writing full pipeline output
-and logs to `validation/output/` (gitignored -- it's regenerated each run, not a permanent record).
+This trains two small real classifiers from bundled data (no multi-GB taxonomy download needed --
+see `data/SOURCES.md`), then runs the scenarios above, writing full pipeline output and logs to
+`validation/output/` (gitignored -- it's regenerated each run, not a permanent record).
 
-The script exits non-zero on the first failure (`set -euo pipefail`), so a clean exit means all
-four scenarios completed without error.
+The script exits non-zero on the first failure (`set -euo pipefail`), so a clean exit means every
+scenario completed without error.
 
 ## `--with-unite` (heavy, opt-in)
 

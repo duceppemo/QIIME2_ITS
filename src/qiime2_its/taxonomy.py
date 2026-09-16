@@ -12,9 +12,9 @@ _RANK_TO_CODE = {
     'genus': 'g',
     'family': 'f',
     'order': 'o',
-    'clade': 'c',
+    'class': 'c',
     'phylum': 'p',
-    'superkingdom': 'k',
+    'kingdom': 'k',
 }
 
 

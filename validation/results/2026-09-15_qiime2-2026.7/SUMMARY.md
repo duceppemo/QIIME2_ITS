@@ -1,3 +1,11 @@
+> **Erratum (2026-09-16)**: the "Classifications came back `unidentified`... as expected" claim
+> below is wrong. The real cause was a corrupted `acc2taxid.tsv` fixture (see
+> `data/SOURCES.md`'s erratum) that made every taxid in the training data invalid, combined with a
+> separate real bug in the NCBI-rank-to-QIIME2-code mapping. Both are now fixed; see
+> `../2026-09-16_qiime2-2026.7/SUMMARY.md` for corrected, re-verified results. Everything else in
+> this record (ASV counts, retention rates, the size-filter/RC spot-checks, the listed QIIME2
+> compatibility bugs) is still accurate -- none of that was affected by the taxid bug.
+
 # Validation run: 2026-09-15
 
 - **QIIME2**: `rachis-qiime2-2026.7` (q2cli 2026.7.0)

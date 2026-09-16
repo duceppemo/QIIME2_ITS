@@ -1,0 +1,61 @@
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/data/single_end as CasavaOneEightSingleLanePerSampleDirFmt to /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/raw-demux-seqs.qza
+Saved SampleData[SequencesWithQuality] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/its-demux-seqs.qza
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/its-demux-seqs.qza as SingleLanePerSampleSingleEndFastqDirFmt to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/exported_reads
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/exported_reads as CasavaOneEightSingleLanePerSampleDirFmt to /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/demux-seqs.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/demux-seqs.qzv
+Saved FeatureTable[Frequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/table.qza
+Saved FeatureData[Sequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/rep-seqs.qza
+Saved SampleData[DADA2Stats] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/stats.qza
+Saved DADA2BaseTransitionStats to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/base-transition-stats.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/stats.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/table.qza as BIOMV210DirFmt to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/biom_table
+Saved ImmutableMetadata to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/feature-frequencies.qza
+Saved ImmutableMetadata to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/sample-frequencies.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/table.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/rep-seqs.qzv
+Saved FeatureData[AlignedSequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/aligned-rep-seqs.qza
+Saved FeatureData[AlignedSequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/masked-aligned-rep-seqs.qza
+Saved Phylogeny[Unrooted] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/unrooted-tree.qza
+Saved Phylogeny[Rooted] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/rooted-tree.qza
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/unrooted-tree.qza as NewickDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline
+Saved FeatureTable[Frequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/rarefied_table.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/faith_pd_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/observed_features_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/shannon_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/evenness_vector.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/unweighted_unifrac_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/weighted_unifrac_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/jaccard_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/bray_curtis_distance_matrix.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/unweighted_unifrac_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/weighted_unifrac_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/jaccard_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/bray_curtis_pcoa_results.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/unweighted_unifrac_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/weighted_unifrac_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/jaccard_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/core-metrics-results/bray_curtis_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/alpha-rarefaction.qzv
+Saved FeatureData[Taxonomy] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/taxonomy.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/taxonomy.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/taxonomy.qza as TSVTaxonomyDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/biom_table
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/fasta_classifier_pipeline/taxa-bar-plots.qzv
+Importing data into QIIME2...
+Extracting ITS region with ITSxpress...
+Exporting reads for post-processing...
+Checking for empty entries...
+sampleB_S2_L001_R1_001.fastq.gz: total sequences: 113, good sequences: 113, empty sequences: 0
+sampleA_S1_L001_R1_001.fastq.gz: total sequences: 113, good sequences: 113, empty sequences: 0
+Re-importing processed reads into QIIME2...
+Denoising data with DADA2...
+Exporting BIOM table...
+Summarizing feature table and representative sequences...
+Aligning representative sequences and building phylogenetic tree...
+Analyzing alpha and beta diversity...
+Creating rarefaction plot...
+Assigning taxonomy to representative sequences...
+Exporting taxonomy...
+Incorporating taxonomy into BIOM table...
+Exporting BIOM table with taxonomy...
+Creating bar plot of sample composition...
+DONE!

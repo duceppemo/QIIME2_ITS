@@ -69,18 +69,23 @@ class TestAccessionsToTaxids:
 class TestTaxdumpParsing:
     @pytest.fixture
     def taxdump_files(self, tmp_path):
+        # Mirrors the real NCBI taxdump shape for Fungi: a 'clade' node
+        # (Opisthokonta-like, not a Linnean rank) sits between kingdom and
+        # phylum and must NOT be treated as a class.
         nodes = tmp_path / 'nodes.dmp'
         nodes.write_text(
             '1\t|\t1\t|\tno rank\t|\n'
-            '4751\t|\t1\t|\tsuperkingdom\t|\n'
-            '4890\t|\t4751\t|\tphylum\t|\n'
+            '4751\t|\t1\t|\tkingdom\t|\n'
+            '33154\t|\t4751\t|\tclade\t|\n'
+            '4890\t|\t33154\t|\tphylum\t|\n'
             '147545\t|\t4890\t|\tclass\t|\n'
-            '5204\t|\t147545\t|\tphylum\t|\n'
         )
         names = tmp_path / 'names.dmp'
         names.write_text(
             '4751\t|\tFungi\t|\t\t|\tscientific name\t|\n'
+            '33154\t|\tOpisthokonta\t|\t\t|\tscientific name\t|\n'
             '4890\t|\tAscomycota\t|\t\t|\tscientific name\t|\n'
+            '147545\t|\tSaccharomycetes\t|\t\t|\tscientific name\t|\n'
         )
         merged = tmp_path / 'merged.dmp'
         merged.write_text('')
@@ -89,12 +94,13 @@ class TestTaxdumpParsing:
     def test_parse_nodes_dmp(self, taxdump_files):
         nodes_file, _, _ = taxdump_files
         node_dict = taxonomy.parse_nodes_dmp(nodes_file)
-        assert node_dict['4890'] == ('4751', 'phylum')
+        assert node_dict['4890'] == ('33154', 'phylum')
 
     def test_parse_names_dmp_only_keeps_scientific_name(self, taxdump_files):
         _, names_file, _ = taxdump_files
         names_dict = taxonomy.parse_names_dmp(names_file)
-        assert names_dict == {'4751': 'Fungi', '4890': 'Ascomycota'}
+        assert names_dict == {'4751': 'Fungi', '33154': 'Opisthokonta', '4890': 'Ascomycota',
+                               '147545': 'Saccharomycetes'}
 
     def test_apply_merged_taxids_remaps_old_to_new(self, tmp_path):
         merged = tmp_path / 'merged.dmp'
@@ -103,12 +109,27 @@ class TestTaxdumpParsing:
         assert result == {'222': 'ACC1'}
         assert '111' not in result
 
-    def test_lineage_string_builds_expected_ranks(self, taxdump_files):
+    def test_lineage_string_skips_the_intervening_clade(self, taxdump_files):
+        """Regression test: a real NCBI lineage has a 'clade' node
+        (Opisthokonta) between kingdom and phylum. It must be skipped, not
+        mistaken for class -- 'clade' is not a Linnean rank."""
         nodes_file, names_file, _ = taxdump_files
         node_dict = taxonomy.parse_nodes_dmp(nodes_file)
         names_dict = taxonomy.parse_names_dmp(names_file)
         lineage = taxonomy.lineage_string('4890', node_dict, names_dict)
         assert lineage == 'k__Fungi;p__Ascomycota;c__unidentified;o__unidentified;' \
+                           'f__unidentified;g__unidentified;s__unidentified'
+        assert 'Opisthokonta' not in lineage
+
+    def test_lineage_string_maps_class_rank_correctly(self, taxdump_files):
+        """Regression test: the original rank map used NCBI rank 'clade' for
+        the class slot and 'superkingdom' for kingdom -- neither matches real
+        NCBI taxonomy, which uses 'class' and 'kingdom'."""
+        nodes_file, names_file, _ = taxdump_files
+        node_dict = taxonomy.parse_nodes_dmp(nodes_file)
+        names_dict = taxonomy.parse_names_dmp(names_file)
+        lineage = taxonomy.lineage_string('147545', node_dict, names_dict)
+        assert lineage == 'k__Fungi;p__Ascomycota;c__Saccharomycetes;o__unidentified;' \
                            'f__unidentified;g__unidentified;s__unidentified'
 
     def test_write_taxonomy_file(self, tmp_path, taxdump_files):
