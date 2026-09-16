@@ -87,6 +87,10 @@ def _build_synthetic_output_folder(tmp_path):
         'method name': 'PERMANOVA', 'test statistic name': 'pseudo-F',
         'sample size': '4', 'number of groups': '2', 'test statistic': '1.5', 'p-value': '0.2',
     })
+    _write_beta_qzv(out / 'beta-group-significance-host-plant-unweighted_unifrac.qzv', {
+        'method name': 'PERMANOVA', 'test statistic name': 'pseudo-F',
+        'sample size': '4', 'number of groups': '2', 'test statistic': '0.4', 'p-value': '0.5',
+    })
     _write_rarefaction_qzv(out / 'alpha-rarefaction.qzv', {
         'observed_features': {
             'sampleA': {'depth-1_iter-1': '1.0', 'depth-1_iter-2': '1.0'},
@@ -104,6 +108,47 @@ def _build_synthetic_output_folder(tmp_path):
         'sampleA\tsiteA\nsampleB\tsiteA\nsampleC\tsiteB\nsampleD\tsiteB\n'
     )
     return out, metadata_path
+
+
+class TestSplitBetaStem:
+    """Regression coverage for the overlapping-text bug real report.pdf
+    generation caught: the beta-group-significance table used to dump the
+    whole beta-group-significance-{column}-{metric}.qzv stem into one cell,
+    which overflowed its column and drew over the next one for anything but
+    the shortest column names."""
+
+    def test_splits_column_and_metric(self):
+        assert report._split_beta_stem('beta-group-significance-site-bray_curtis') == \
+            ('site', 'bray_curtis')
+
+    def test_handles_hyphenated_column_names(self):
+        # Metadata column names can themselves contain hyphens (e.g.
+        # "host-plant"), so this can't be a naive rsplit('-', 1).
+        assert report._split_beta_stem('beta-group-significance-host-plant-unweighted_unifrac') == \
+            ('host-plant', 'unweighted_unifrac')
+
+    def test_unrecognized_metric_suffix_falls_back_to_whole_remainder(self):
+        column, metric = report._split_beta_stem('beta-group-significance-site-some_new_metric')
+        assert metric == ''
+        assert column == 'site-some_new_metric'
+
+
+class TestFitCellText:
+    def test_short_text_passes_through_unchanged(self):
+        pdf = report._ReportPDF()
+        pdf.add_page()
+        pdf.set_font('Helvetica', '', 8)
+        assert pdf._fit_cell_text('site', 40) == 'site'
+
+    def test_long_text_is_truncated_with_an_ellipsis_and_fits(self):
+        pdf = report._ReportPDF()
+        pdf.add_page()
+        pdf.set_font('Helvetica', '', 8)
+        long_text = 'beta-group-significance-collection-date-bray_curtis'
+        fitted = pdf._fit_cell_text(long_text, 30)
+        assert fitted != long_text
+        assert fitted.endswith('...')
+        assert pdf.get_string_width(fitted) <= 30 - 2 * pdf.c_margin
 
 
 class TestBuildReport:

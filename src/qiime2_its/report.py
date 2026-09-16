@@ -59,6 +59,22 @@ class _ReportPDF(FPDF):
             self.set_x(self.l_margin)
             self.multi_cell(0, 7, line)
 
+    def _fit_cell_text(self, text, width):
+        # cell() doesn't wrap or clip -- text wider than the cell just draws
+        # past its border and overlaps whatever's in the next cell. Truncate
+        # with an ellipsis instead, so a longer-than-expected value (a long
+        # metadata column name, an unexpectedly long sample id, ...) stays
+        # inside its own cell rather than corrupting its neighbor.
+        # '...' rather than the Unicode ellipsis: the base Helvetica font
+        # (WinAnsi-encoded) can't represent U+2026.
+        ellipsis = '...'
+        pad = 2 * self.c_margin
+        if self.get_string_width(text) <= width - pad:
+            return text
+        while text and self.get_string_width(text + ellipsis) > width - pad:
+            text = text[:-1]
+        return (text + ellipsis) if text else ellipsis
+
     def add_table_page(self, title, header, rows):
         # Wide tables (many columns, e.g. DADA2 retention) get cramped in
         # portrait; landscape gives them roughly 40% more width.
@@ -73,12 +89,12 @@ class _ReportPDF(FPDF):
         col_width = (self.w - 2 * self.l_margin) / n_cols
         self.set_font('Helvetica', 'B', 8)
         for h in header:
-            self.cell(col_width, 7, str(h), border=1)
+            self.cell(col_width, 7, self._fit_cell_text(str(h), col_width), border=1)
         self.ln()
         self.set_font('Helvetica', '', 8)
         for row in rows:
             for value in row:
-                self.cell(col_width, 6, str(value), border=1)
+                self.cell(col_width, 6, self._fit_cell_text(str(value), col_width), border=1)
             self.ln()
 
     def add_figure_page(self, title, fig, width=180):
@@ -92,6 +108,20 @@ _DADA2_COLUMN_LABELS = {
     'percentage of input merged': '% merged',
     'percentage of input non-chimeric': '% non-chimeric',
 }
+
+# Matches the beta-group-significance-{column}-{metric}.qzv naming pipeline.py builds
+# (cli/pipeline.py's `_run_advanced_stats`). Listed explicitly rather than rsplit() on
+# '-' because metadata column names can themselves contain hyphens (e.g. "host-plant").
+_BETA_DISTANCE_METRICS = ('bray_curtis', 'unweighted_unifrac')
+
+
+def _split_beta_stem(stem):
+    stem = stem.removeprefix('beta-group-significance-')
+    for metric in _BETA_DISTANCE_METRICS:
+        suffix = f'-{metric}'
+        if stem.endswith(suffix):
+            return stem[:-len(suffix)], metric
+    return stem, ''
 
 
 def _dada2_summary_table(output_folder):
@@ -223,12 +253,13 @@ def build_report(output_folder, metadata_file, report_column=None):
     beta_rows = []
     for qzv_path in sorted(output_folder.glob('beta-group-significance-*.qzv')):
         stats = report_data.parse_beta_group_significance(qzv_path)
-        beta_rows.append([qzv_path.stem, stats.get('test_statistic_name'),
+        column, metric = _split_beta_stem(qzv_path.stem)
+        beta_rows.append([column, metric, stats.get('test_statistic_name'),
                            f'{stats["test_statistic"]:.3f}' if stats.get('test_statistic') is not None else '',
                            f'{stats["p_value"]:.3f}' if stats.get('p_value') is not None else ''])
     if beta_rows:
         pdf.add_table_page('Beta diversity group significance (PERMANOVA)',
-                            ['comparison', 'statistic', 'value', 'p-value'], beta_rows)
+                            ['metadata column', 'distance metric', 'statistic', 'value', 'p-value'], beta_rows)
 
     if report_column:
         for metric in ('bray_curtis', 'unweighted_unifrac'):
