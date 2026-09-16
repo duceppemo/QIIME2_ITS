@@ -5,6 +5,24 @@ import pytest
 from qiime2_its import fastq_utils
 
 
+class TestIsEmptyFastq:
+    def test_true_for_zero_read_gzipped_file(self, tmp_path):
+        fq = tmp_path / 'empty.fastq.gz'
+        with gzip.open(fq, 'wt'):
+            pass  # valid gzip stream, zero records -- a real "sample had 0 reads" case
+        assert fastq_utils.is_empty_fastq(fq) is True
+
+    def test_true_for_zero_read_plain_file(self, tmp_path):
+        fq = tmp_path / 'empty.fastq'
+        fq.write_text('')
+        assert fastq_utils.is_empty_fastq(fq) is True
+
+    def test_false_for_non_empty_file(self, tmp_path, write_fastq):
+        fq = tmp_path / 'sample_bc_L001_R1_001.fastq.gz'
+        write_fastq(fq, [('@r1', 'ACGT', 'IIII')], gz=True)
+        assert fastq_utils.is_empty_fastq(fq) is False
+
+
 class TestListFastq:
     def test_finds_all_accepted_extensions(self, tmp_path):
         names = ['a.fastq', 'b.fastq.gz', 'c.fq', 'd.fq.gz', 'e.txt']
@@ -51,10 +69,17 @@ class TestValidateCasavaFilenames:
         'sample_barcode_001_R1_001.fastq.gz',       # lane doesn't start with L
         'sample_barcode_L001_R3_001.fastq.gz',      # bad direction
         'sample_barcode_L001_R1_002.fastq.gz',      # set number not 001
+        'siteA_rep1_S1_L001_R1_001.fastq.gz',       # underscore inside the sample identifier itself
     ])
     def test_rejects_invalid_names(self, bad_name):
         with pytest.raises(ValueError):
             fastq_utils.validate_casava_filenames([bad_name])
+
+    def test_hyphen_in_sample_identifier_is_accepted(self):
+        """Real-world workaround for the underscore restriction above: hyphens
+        inside the sample identifier are fine, since they don't affect the
+        underscore-delimited field count."""
+        fastq_utils.validate_casava_filenames(['siteA-rep1_S1_L001_R1_001.fastq.gz'])  # no raise
 
 
 class TestStripNonFastqFiles:

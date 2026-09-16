@@ -1,0 +1,140 @@
+"""Integration-style test for report.build_report(): builds a full PDF from a
+synthetic (but realistically-shaped) output_folder, so the whole
+report_data -> matplotlib -> fpdf2 pipeline is exercised in CI without
+needing QIIME2 installed. Regression coverage for exactly the kind of bug
+real-data testing caught: fpdf2's multi_cell() not resetting the cursor to
+the left margin between calls the way cell(new_x='LMARGIN') does, which blew
+up on the second line of the title page.
+"""
+import json
+import zipfile
+
+from qiime2_its import report
+
+
+def _write_alpha_qzv(path, column_stats):
+    with zipfile.ZipFile(path, 'w') as zf:
+        for column, (h, p, groups) in column_stats.items():
+            group_data = json.dumps({'name': None, 'index': list(groups), 'data': list(groups.values())})
+            content = (f"load_data('{column}',{group_data},{{}},"
+                       f'{{"H": {h}, "p": {p}}},\'<table></table>\',\'x.csv\', \'metric\');')
+            zf.writestr(f'uuid1/data/column-{column}.jsonp', content)
+
+
+def _write_beta_qzv(path, overview_rows):
+    html = '<html><body><table>' + ''.join(
+        f'<th>{k}</th><td>{v}</td>' for k, v in overview_rows.items()) + '</table></body></html>'
+    with zipfile.ZipFile(path, 'w') as zf:
+        zf.writestr('uuid2/data/index.html', html)
+
+
+def _write_rarefaction_qzv(path, metrics_rows):
+    """metrics_rows: {metric: {sample_id: {col: value}}}."""
+    with zipfile.ZipFile(path, 'w') as zf:
+        for metric, rows in metrics_rows.items():
+            fieldnames = sorted({c for row in rows.values() for c in row})
+            lines = ['sample-id,' + ','.join(fieldnames)]
+            for sample_id, row in rows.items():
+                lines.append(sample_id + ',' + ','.join(row.get(c, '') for c in fieldnames))
+            zf.writestr(f'uuid3/data/{metric}.csv', '\n'.join(lines))
+
+
+def _write_classifier_qzv(path, accuracy_tsv):
+    with zipfile.ZipFile(path, 'w') as zf:
+        zf.writestr('uuid4/data/predictive_accuracy.tsv', accuracy_tsv)
+
+
+def _build_synthetic_output_folder(tmp_path):
+    out = tmp_path / 'output'
+    (out / 'dada2_stats').mkdir(parents=True)
+    (out / 'dada2_stats' / 'stats.tsv').write_text(
+        'sample-id\tinput\tnon-chimeric\tpercentage of input non-chimeric\n'
+        '#q2:types\tnumeric\tnumeric\tnumeric\n'
+        'sampleA\t100\t80\t80.0\n'
+        'sampleB\t90\t60\t66.7\n'
+        'sampleC\t95\t70\t73.7\n'
+        'sampleD\t85\t50\t58.8\n'
+    )
+
+    (out / 'sample_frequencies').mkdir(parents=True)
+    (out / 'sample_frequencies' / 'metadata.tsv').write_text(
+        'Sample ID\tFrequency\n#q2:types\tcategorical\n'
+        'sampleA\t80.0\nsampleB\t60.0\nsampleC\t70.0\nsampleD\t50.0\n'
+    )
+
+    (out / 'biom_table').mkdir(parents=True)
+    (out / 'biom_table' / 'table-with-taxonomy.biom.tsv').write_text(
+        '# Constructed from biom file\n'
+        '#OTU ID\tsampleA\tsampleB\tsampleC\tsampleD\ttaxonomy\n'
+        'f1\t50.0\t30.0\t40.0\t20.0\tk__Fungi; p__Ascomycota; g__Fusarium\n'
+        'f2\t30.0\t30.0\t30.0\t30.0\tk__Fungi; p__Basidiomycota; g__Trichosporon\n'
+    )
+
+    for metric in ('bray_curtis', 'unweighted_unifrac'):
+        d = out / 'core-metrics-results' / f'{metric}_pcoa_export'
+        d.mkdir(parents=True)
+        (d / 'ordination.txt').write_text(
+            'Eigvals\t2\n0.5\t0.03\n\nProportion explained\t2\n0.8\t0.1\n\nSpecies\t0\t0\n\n'
+            'Site\t4\t2\n'
+            'sampleA\t0.4\t-0.1\nsampleB\t-0.5\t-0.05\nsampleC\t0.1\t0.2\nsampleD\t0.0\t0.0\n\n'
+            'Biplot\t0\t0\n\nSite constraints\t0\t0\n'
+        )
+
+    _write_alpha_qzv(out / 'alpha-group-significance-shannon.qzv', {
+        'site': (0.9, 0.6, {'siteA (n=2)': [0.97, 1.5], 'siteB (n=2)': [1.2, 1.3]}),
+    })
+    _write_beta_qzv(out / 'beta-group-significance-site-bray_curtis.qzv', {
+        'method name': 'PERMANOVA', 'test statistic name': 'pseudo-F',
+        'sample size': '4', 'number of groups': '2', 'test statistic': '1.5', 'p-value': '0.2',
+    })
+    _write_rarefaction_qzv(out / 'alpha-rarefaction.qzv', {
+        'observed_features': {
+            'sampleA': {'depth-1_iter-1': '1.0', 'depth-1_iter-2': '1.0'},
+            'sampleB': {'depth-1_iter-1': '1.0', 'depth-1_iter-2': '2.0'},
+        },
+    })
+    (out / 'sample-classifier-site').mkdir(parents=True)
+    _write_classifier_qzv(out / 'sample-classifier-site' / 'accuracy_results.qzv',
+                           'x\tA\tB\tOverall Accuracy\nA\t1.0\t0.0\t\nB\t0.0\t1.0\t\n'
+                           'Overall Accuracy\t\t\t0.75\nBaseline Accuracy\t\t\t0.5\nAccuracy Ratio\t\t\t1.5\n')
+
+    metadata_path = tmp_path / 'metadata.tsv'
+    metadata_path.write_text(
+        'sample-id\tsite\n#q2:types\tcategorical\n'
+        'sampleA\tsiteA\nsampleB\tsiteA\nsampleC\tsiteB\nsampleD\tsiteB\n'
+    )
+    return out, metadata_path
+
+
+class TestBuildReport:
+    def test_produces_a_valid_multi_page_pdf(self, tmp_path):
+        output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
+
+        report_path = report.build_report(output_folder, metadata_path)
+
+        assert report_path == output_folder / 'report.pdf'
+        assert report_path.stat().st_size > 1000
+        assert report_path.read_bytes()[:4] == b'%PDF'
+
+    def test_auto_picks_first_eligible_column_when_not_specified(self, tmp_path):
+        output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
+        # Should not raise, and should pick up 'site' automatically.
+        report_path = report.build_report(output_folder, metadata_path, report_column=None)
+        assert report_path.exists()
+
+    def test_works_with_missing_optional_artifacts(self, tmp_path):
+        """A --skip-advanced-stats run won't have any of the group-
+        significance/classifier/pcoa-export artifacts -- the report should
+        degrade gracefully to just the pages it has data for, not crash."""
+        out = tmp_path / 'output'
+        (out / 'dada2_stats').mkdir(parents=True)
+        (out / 'dada2_stats' / 'stats.tsv').write_text(
+            'sample-id\tinput\n#q2:types\tnumeric\nsampleA\t100\n'
+        )
+        metadata_path = tmp_path / 'metadata.tsv'
+        metadata_path.write_text('sample-id\tsite\nsampleA\tsiteA\n')
+
+        report_path = report.build_report(out, metadata_path)
+
+        assert report_path.exists()
+        assert report_path.read_bytes()[:4] == b'%PDF'

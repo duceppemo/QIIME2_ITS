@@ -1,10 +1,13 @@
 """Main ITS pipeline: import -> (optional) ITSxpress trim -> (optional) size
-filter -> DADA2 denoise -> phylogeny -> diversity -> taxonomy -> barplot.
+filter -> DADA2 denoise -> phylogeny -> diversity -> taxonomy -> barplot ->
+(optional) diversity/composition/classifier stats -> (optional) PDF report.
 """
 import argparse
+import subprocess
 from pathlib import Path
 
-from qiime2_its import biom_utils, env_checks, fastq_utils, itsxpress_wrapper, qiime_wrapper, size_filter
+from qiime2_its import (biom_utils, env_checks, fastq_utils, itsxpress_wrapper, metadata_utils, qiime_wrapper,
+                         report, report_data, size_filter, taxonomy)
 from qiime2_its._version import __version__
 from qiime2_its.itsxpress_wrapper import TAXA_CODES
 
@@ -50,6 +53,11 @@ class Pipeline:
         # Diversity analysis
         self.sampling_depth = args.sampling_depth
         self.max_rarefaction_depth = args.max_rarefaction_depth
+
+        # Group-significance/taxonomy-collapse/classifier stats and the PDF report
+        self.skip_advanced_stats = args.skip_advanced_stats
+        self.skip_report = args.skip_report
+        self.report_column = args.report_metadata_column
 
         self.fastq_list = []
         self.sample_dict = {}
@@ -153,7 +161,96 @@ class Pipeline:
         qiime_wrapper.taxa_barplot(table_qza, taxonomy_qza, self.metadata_file,
                                     self.output_folder / 'taxa-bar-plots.qzv')
 
+        print('Exporting sample read-frequency table...')
+        qiime_wrapper.export(self.output_folder / 'sample-frequencies.qza',
+                              self.output_folder / 'sample_frequencies')
+        print('Exporting DADA2 denoising stats...')
+        qiime_wrapper.export(stats_qza, self.output_folder / 'dada2_stats')
+
+        if not self.skip_advanced_stats:
+            self._run_advanced_stats(table_qza, taxonomy_qza)
+
+        if not self.skip_report:
+            print('Building PDF report...')
+            report_path = report.build_report(self.output_folder, self.metadata_file, self.report_column)
+            print(f'Report written to {report_path}')
+
         print('DONE!')
+
+    def _run_advanced_stats(self, table_qza, taxonomy_qza):
+        """Diversity group-significance tests, a genus-level composition
+        table, and best-effort sample classification. Not part of the core
+        pipeline the way DADA2/phylogeny/diversity are: every step here is
+        either read-only reporting or explicitly skippable per metadata
+        column when the data can't support it.
+        """
+        core_metrics_dir = self.output_folder / 'core-metrics-results'
+
+        sample_freq_path = self.output_folder / 'sample_frequencies' / 'metadata.tsv'
+        sample_frequencies = (report_data.parse_sample_frequencies(sample_freq_path)
+                               if sample_freq_path.exists() else {})
+        # A near-empty input sample can survive DADA2 as a zero-read row
+        # (retain-all-samples defaults to True); it must not count toward
+        # group eligibility for alpha/beta-group-significance/classify-samples.
+        final_sample_ids = [sid for sid, freq in sample_frequencies.items() if freq > 0] \
+            or list(self.sample_dict)
+
+        if metadata_utils.has_alpha_group_significance_column(self.metadata_file, final_sample_ids):
+            print('Testing alpha diversity group significance...')
+            for metric in ('faith_pd', 'observed_features', 'shannon', 'evenness'):
+                alpha_qza = core_metrics_dir / f'{metric}_vector.qza'
+                if alpha_qza.exists():
+                    qiime_wrapper.alpha_group_significance(
+                        alpha_qza, self.metadata_file,
+                        self.output_folder / f'alpha-group-significance-{metric}.qzv')
+        else:
+            print('Skipping alpha diversity group significance: no metadata column has both a '
+                  'repeated and a varying value.')
+
+        eligible_columns = metadata_utils.eligible_categorical_columns(self.metadata_file, final_sample_ids)
+
+        print('Testing beta diversity group significance...')
+        for column in eligible_columns:
+            for metric in ('bray_curtis', 'unweighted_unifrac'):
+                distance_qza = core_metrics_dir / f'{metric}_distance_matrix.qza'
+                if distance_qza.exists():
+                    qiime_wrapper.beta_group_significance(
+                        distance_qza, self.metadata_file, column,
+                        self.output_folder / f'beta-group-significance-{column}-{metric}.qzv')
+
+        print('Exporting PCoA ordinations...')
+        for metric in ('bray_curtis', 'unweighted_unifrac'):
+            pcoa_qza = core_metrics_dir / f'{metric}_pcoa_results.qza'
+            if pcoa_qza.exists():
+                qiime_wrapper.export(pcoa_qza, core_metrics_dir / f'{metric}_pcoa_export')
+
+        # Genus (level 6) if the classifier resolved that deep for enough of
+        # this dataset; qiime taxa collapse otherwise fails outright if the
+        # requested level exceeds every feature's actual lineage depth,
+        # which classifiers commonly don't reach for reads unrelated to
+        # their training set.
+        taxonomy_tsv_path = self.output_folder / 'biom_table' / 'taxonomy.tsv'
+        max_depth = taxonomy.max_lineage_depth(taxonomy_tsv_path) if taxonomy_tsv_path.exists() else 6
+        collapse_level = min(6, max_depth) if max_depth > 0 else 1
+        print(f'Collapsing feature table to taxonomic level {collapse_level}...')
+        collapsed_qza = self.output_folder / 'table-genus.qza'
+        relative_qza = self.output_folder / 'table-genus-relative.qza'
+        qiime_wrapper.taxa_collapse(table_qza, taxonomy_qza, collapse_level, collapsed_qza)
+        qiime_wrapper.relative_frequency(collapsed_qza, relative_qza)
+
+        print('Training sample classifiers for eligible metadata columns...')
+        for column in eligible_columns:
+            class_sizes = metadata_utils.class_sizes(self.metadata_file, column, final_sample_ids)
+            smallest_class = min(class_sizes.values())
+            if smallest_class < 2:
+                print(f'\tSkipping classifier for "{column}": at least one class has fewer than 2 samples.')
+                continue
+            classifier_dir = self.output_folder / f'sample-classifier-{column}'
+            try:
+                qiime_wrapper.classify_samples(table_qza, self.metadata_file, column, classifier_dir,
+                                                cv=min(5, smallest_class))
+            except subprocess.CalledProcessError:
+                print(f'\tSkipping classifier for "{column}": training failed (see the QIIME2 error above).')
 
     def _import(self, fastq_folder, output_qza):
         if self.paired:
@@ -223,6 +320,14 @@ class Pipeline:
             raise ValueError('No fastq files found in the provided input folder.')
 
         fastq_utils.validate_casava_filenames(self.fastq_list)
+
+        empty_samples = sorted({Path(fq).name.split('_')[0] for fq in self.fastq_list
+                                 if fastq_utils.is_empty_fastq(fq)})
+        if empty_samples:
+            raise ValueError(
+                'The following sample(s) have an empty (zero-read) fastq file: {}. ITSxpress and '
+                'DADA2 cannot process an empty sample -- remove it from the input folder and from '
+                'the metadata file before running.'.format(', '.join(empty_samples)))
 
         env_checks.check_qiime2_env_active()
 
@@ -313,6 +418,23 @@ def build_parser():
                                  'pilot datasets.')
     diversity.add_argument('--max-rarefaction-depth', metavar='4000', type=int, default=4000,
                             help='Maximum depth for the alpha-rarefaction plot. Default is 4000.')
+
+    advanced = parser.add_argument_group(
+        'Advanced stats and report',
+        'Diversity group-significance tests, a genus-level composition table, best-effort sample '
+        'classification per eligible metadata column, and a PDF summary report. Run by default '
+        'after the core pipeline.')
+    advanced.add_argument('--skip-advanced-stats', action='store_true',
+                           help='Skip group-significance tests, taxonomy collapse, and sample '
+                                'classification.')
+    advanced.add_argument('--skip-report', action='store_true',
+                           help='Skip building the PDF summary report.')
+    advanced.add_argument('--report-metadata-column', metavar='COLUMN', default=None, type=str,
+                           help='Categorical metadata column to group the PDF report\'s alpha/beta '
+                                'diversity plots by. Defaults to the first eligible (>=2 distinct '
+                                'values, >=2 samples each) categorical column. Group-significance '
+                                'tests and sample classification still run against every eligible '
+                                'column regardless of this choice -- it only affects the report.')
 
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     return parser

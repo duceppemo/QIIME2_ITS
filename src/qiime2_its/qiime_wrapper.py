@@ -207,3 +207,62 @@ def taxa_barplot(table_qza, taxonomy_qza, metadata_file, output_qzv):
            '--m-metadata-file', str(metadata_file),
            '--o-visualization', str(output_qzv)]
     _run(cmd)
+
+
+# --- Group-significance, taxonomy collapse, and sample classification ---
+
+def alpha_group_significance(alpha_qza, metadata_file, output_qzv):
+    """Kruskal-Wallis test of one alpha-diversity vector against every
+    categorical column in `metadata_file` (all in one call)."""
+    cmd = ['qiime', 'diversity', 'alpha-group-significance',
+           '--i-alpha-diversity', str(alpha_qza),
+           '--m-metadata-file', str(metadata_file),
+           '--o-visualization', str(output_qzv)]
+    _run(cmd)
+
+
+def beta_group_significance(distance_matrix_qza, metadata_file, column, output_qzv, method='permanova'):
+    """PERMANOVA (by default) test of one distance matrix against one
+    categorical metadata column."""
+    cmd = ['qiime', 'diversity', 'beta-group-significance',
+           '--i-distance-matrix', str(distance_matrix_qza),
+           '--m-metadata-file', str(metadata_file),
+           '--m-metadata-column', column,
+           '--p-method', method,
+           '--o-visualization', str(output_qzv)]
+    _run(cmd)
+
+
+def taxa_collapse(table_qza, taxonomy_qza, level, output_qza):
+    """Collapse a feature table to the given taxonomic level (6 = genus, 7 = species
+    in this pipeline's k;p;c;o;f;g;s lineage strings)."""
+    cmd = ['qiime', 'taxa', 'collapse',
+           '--i-table', str(table_qza),
+           '--i-taxonomy', str(taxonomy_qza),
+           '--p-level', str(level),
+           '--o-collapsed-table', str(output_qza)]
+    _run(cmd)
+
+
+def relative_frequency(table_qza, output_qza):
+    cmd = ['qiime', 'feature-table', 'relative-frequency',
+           '--i-table', str(table_qza),
+           '--o-relative-frequency-table', str(output_qza)]
+    _run(cmd)
+
+
+def classify_samples(table_qza, metadata_file, column, output_dir, cv, n_estimators=100):
+    """Train a random-forest classifier predicting `column` from `table_qza`.
+
+    `cv` should be capped by the caller to what the smallest class in
+    `column` can support (scikit-learn's stratified k-fold cross-validation
+    requires cv <= the smallest class size).
+    """
+    cmd = ['qiime', 'sample-classifier', 'classify-samples',
+           '--i-table', str(table_qza),
+           '--m-metadata-file', str(metadata_file),
+           '--m-metadata-column', column,
+           '--p-cv', str(cv),
+           '--p-n-estimators', str(n_estimators),
+           '--output-dir', str(output_dir)]
+    _run(cmd)

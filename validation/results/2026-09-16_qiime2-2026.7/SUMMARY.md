@@ -2,8 +2,10 @@
 
 - **QIIME2**: `rachis-qiime2-2026.7` (q2cli 2026.7.0)
 - **ITSxpress**: 2.2.0 (via `qiime itsxpress` plugin)
-- **Result**: all 7 steps (2 classifier trainings + 5 pipeline runs) in `run_validation.sh`
-  completed successfully (`DONE!`/`Done`, exit 0)
+- **Result**: all 8 steps (2 classifier trainings + 6 pipeline runs) in `run_validation.sh`
+  completed successfully (`DONE!`/`Done`, exit 0). Logs in this directory reflect the final state
+  of both validation passes below (the taxid/rank-mapping fixes and the advanced-stats/report
+  addition), not two separate sets.
 
 ## Why this run exists
 
@@ -68,3 +70,49 @@ e.g. `NR_132210.1  k__Fungi;p__Ascomycota;c__Saccharomycetes;o__Saccharomycetale
 - `qiime2-its-train-unite`'s ambiguous file matching, leaked `.fasta` extension, dead `-t` flag.
 
 None of these regressed in this run.
+
+## Second pass this same day: advanced stats, sample classification, and the PDF report
+
+Added `qiime diversity alpha-group-significance`/`beta-group-significance`, `qiime taxa collapse` +
+`feature-table relative-frequency`, `qiime sample-classifier classify-samples`, and a PDF report
+(`report.pdf`) built from the pipeline's own output, run by default after the core pipeline. Also
+added a new bundled dataset, `data/multi_sample/` + `data/metadata_multi.tsv` (6 real samples, 5
+healthy + 1 deliberately near-empty, 4 metadata columns), as `run_validation.sh`'s
+`multi_sample_advanced_stats` scenario -- the 2-sample `metadata.tsv` used by the other scenarios
+has only one column with one unique value per sample, too small for any of this to exercise
+meaningfully.
+
+Real bugs found and fixed while validating this against real data (all in `src/qiime2_its/`, not
+in `validation/`):
+
+1. **`qiime diversity alpha-group-significance` fails outright, for the whole metadata file, if no
+   categorical column has both a repeated and a varying value** (its own message: "doesn't consist
+   of unique values, and doesn't consist of exactly one value") -- exactly the case for the
+   2-sample/1-column `metadata.tsv`, which crashed `paired_end` and every other small scenario the
+   moment this feature was added. Added `metadata_utils.has_alpha_group_significance_column()`
+   (a different, looser eligibility rule than the >=2-per-group one already used for
+   beta-group-significance/classify-samples) and gated the alpha-group-significance calls on it,
+   printing a skip message instead.
+2. **`qiime taxa collapse --p-level 6` (genus) fails outright if the classifier never resolved
+   genus for any feature in the dataset** -- routine for a classifier applied to reads unrelated to
+   its training set (confirmed with the bundled toy NCBI classifier, which topped out at level 5 /
+   family for `multi_sample_advanced_stats`'s real reads). Added
+   `taxonomy.max_lineage_depth()` and capped the requested collapse level to
+   `min(6, max_lineage_depth(...))` rather than assuming genus is always reachable.
+3. **A near-empty sample DADA2 reduces to a zero-read row can break `classify-samples`'s internal
+   stratified split even for a metadata column that looks balanced** (e.g. 2 samples per site on
+   paper): confirmed directly by running `qiime sample-classifier classify-samples -m site` by hand
+   against the real 6-sample table and getting "one or more values that match only one sample" once
+   the zero-read sample effectively orphaned one group. Fixed by reading QIIME2's own
+   `sample-frequencies.qza` export to determine the *actual* non-zero sample set before computing
+   eligibility for beta-group-significance/classify-samples, and by wrapping `classify_samples` in
+   a per-column try/except so one bad column doesn't abort the run (both already partly designed
+   for this; this run is what proved the design necessary and correct).
+
+Verified end to end with `multi_sample_advanced_stats`: 4 alpha metrics tested across 4 categorical
+columns, 4 columns x 2 distance metrics for beta-group-significance (8 PERMANOVA results), genus
+collapse correctly fell back to level 5, the `replicate` column's classifier trained successfully
+(overall accuracy 0.33 on a 2-class, 6-sample problem -- unremarkable, but the mechanism works) while
+`site`/`host-plant`/`collection-date` were correctly skipped with a clear reason, and `report.pdf`
+(10 pages) rendered every section with real data -- individually confirmed by rendering each page to
+PNG and inspecting it, not just checking the file exists.

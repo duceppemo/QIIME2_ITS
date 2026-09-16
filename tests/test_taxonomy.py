@@ -138,3 +138,25 @@ class TestTaxdumpParsing:
         taxonomy.write_taxonomy_file({'4890': 'ACC1'}, taxonomy_file, nodes_file, names_file, merged_file)
         line = taxonomy_file.read_text().strip()
         assert line.startswith('ACC1\tk__Fungi;p__Ascomycota;')
+
+
+class TestMaxLineageDepth:
+    def test_returns_the_deepest_lineage_present(self, tmp_path):
+        """Regression test: `qiime taxa collapse --p-level N` fails outright
+        if N exceeds the deepest lineage any feature actually has -- common
+        when a classifier can't resolve reads unrelated to its training set
+        past family/order, well short of the genus level this pipeline
+        otherwise requests by default."""
+        path = tmp_path / 'taxonomy.tsv'
+        path.write_text(
+            '#OTUID\ttaxonomy\tconfidence\n'
+            'f1\tk__Fungi;p__Ascomycota\t1.0\n'
+            'f2\tk__Fungi;p__Ascomycota;c__Sordariomycetes;o__Sordariales\t0.8\n'
+            'f3\tk__Fungi;p__Ascomycota;c__Saccharomycetes;o__Saccharomycetales;f__Saccharomycetaceae\t0.79\n'
+        )
+        assert taxonomy.max_lineage_depth(path) == 5
+
+    def test_returns_zero_for_header_only_file(self, tmp_path):
+        path = tmp_path / 'taxonomy.tsv'
+        path.write_text('#OTUID\ttaxonomy\tconfidence\n')
+        assert taxonomy.max_lineage_depth(path) == 0

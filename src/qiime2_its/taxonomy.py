@@ -146,3 +146,24 @@ def write_taxonomy_file(id_dict, taxonomy_file, nodes_file, names_file, merged_f
     with open(taxonomy_file, 'w') as f:
         for taxid, acc in id_dict.items():
             f.write(f'{acc}\t{lineage_string(taxid, node_dict, names_dict)}\n')
+
+
+def max_lineage_depth(taxonomy_tsv_path):
+    """Greatest number of ';'-separated rank fields across every lineage
+    string in a QIIME2 taxonomy.tsv export (header + "id\\tlineage\\t..."
+    rows, as rewritten by biom_utils.rewrite_taxonomy_header).
+
+    `qiime taxa collapse --p-level N` fails outright if N exceeds this for
+    every feature -- a classifier's assignments commonly don't reach genus/
+    species for reads unrelated to its training set, so a fixed level should
+    be capped to what's actually present rather than assumed.
+    """
+    max_depth = 0
+    with open(taxonomy_tsv_path) as f:
+        next(f, None)  # header
+        for line in f:
+            fields = line.rstrip('\n').split('\t')
+            if len(fields) < 2:
+                continue
+            max_depth = max(max_depth, len(fields[1].split(';')))
+    return max_depth

@@ -15,6 +15,12 @@ redistributing this test data here is unrestricted.
   reads) by ITSxpress's test fixtures, then split the same way. Used as a real stand-in for
   single-end/full-amplicon platforms (e.g. IonTorrent) that this pipeline also supports, since no
   small public IonTorrent ITS dataset was readily available.
+- `multi_sample/` (paired with `metadata_multi.tsv`): the same 250 real read pairs re-split into 6
+  samples across 3 nominal "sites" -- 5 healthy (38-60 pairs each) and one deliberately near-empty
+  (`siteC-rep2`, 2 pairs, which DADA2 reduces to a zero-read row). Exercises multi-sample diversity
+  statistics and the near-empty-sample edge case with real data, rather than the 2-sample
+  `metadata.tsv` used elsewhere, which is too small for group-significance tests or a classifier to
+  do anything meaningful.
 
 ## `classifier_training/`
 

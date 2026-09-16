@@ -17,6 +17,9 @@ covering:
 - single-end reads (a stand-in for full-amplicon single-end platforms like IonTorrent)
 - `--min-len`/`--max-len` read-length filtering (paired-end)
 - `-rc`/`--reverse_complement`
+- multi-sample diversity/composition/classifier stats and the PDF report (alpha/beta
+  group-significance, genus-level collapse, sample-classifier, `report.pdf`), including a
+  deliberately near-empty sample among otherwise-real ones
 
 See `data/SOURCES.md` for where the bundled data comes from and its licensing.
 

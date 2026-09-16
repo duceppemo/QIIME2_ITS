@@ -1,0 +1,8 @@
+sample-id	site	replicate	host-plant	ph	moisture-percent	elevation-m	collection-date
+#q2:types	categorical	categorical	categorical	numeric	numeric	numeric	categorical
+siteA-rep1	siteA	1	Pinus_contorta	5.8	22.4	1340	2026-06-02
+siteA-rep2	siteA	2	Pinus_contorta	5.9	21.1	1340	2026-06-02
+siteB-rep1	siteB	1	Populus_tremuloides	6.4	31.7	980	2026-06-03
+siteB-rep2	siteB	2	Populus_tremuloides	6.3	29.8	980	2026-06-03
+siteC-rep1	siteC	1	Betula_papyrifera	6.9	18.2	1560	2026-06-04
+siteC-rep2	siteC	2	Betula_papyrifera	6.8	17.9	1560	2026-06-04

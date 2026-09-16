@@ -130,3 +130,59 @@ def test_classify(mock_run):
     assert cmd == ['qiime', 'feature-classifier', 'classify-sklearn',
                     '--p-n-jobs', '0', '--i-classifier', 'clf.qza',
                     '--i-reads', 'rep.qza', '--o-classification', 'taxo.qza']
+
+
+def test_alpha_group_significance(mock_run):
+    qiime_wrapper.alpha_group_significance('shannon.qza', 'meta.tsv', 'out.qzv')
+    cmd = mock_run.call_args.args[0]
+    assert cmd == ['qiime', 'diversity', 'alpha-group-significance',
+                    '--i-alpha-diversity', 'shannon.qza',
+                    '--m-metadata-file', 'meta.tsv',
+                    '--o-visualization', 'out.qzv']
+
+
+def test_beta_group_significance_default_method(mock_run):
+    qiime_wrapper.beta_group_significance('bray.qza', 'meta.tsv', 'site', 'out.qzv')
+    cmd = mock_run.call_args.args[0]
+    assert cmd == ['qiime', 'diversity', 'beta-group-significance',
+                    '--i-distance-matrix', 'bray.qza',
+                    '--m-metadata-file', 'meta.tsv',
+                    '--m-metadata-column', 'site',
+                    '--p-method', 'permanova',
+                    '--o-visualization', 'out.qzv']
+
+
+def test_beta_group_significance_custom_method(mock_run):
+    qiime_wrapper.beta_group_significance('bray.qza', 'meta.tsv', 'site', 'out.qzv', method='anosim')
+    cmd = mock_run.call_args.args[0]
+    assert cmd[cmd.index('--p-method') + 1] == 'anosim'
+
+
+def test_taxa_collapse(mock_run):
+    qiime_wrapper.taxa_collapse('table.qza', 'taxo.qza', 6, 'collapsed.qza')
+    cmd = mock_run.call_args.args[0]
+    assert cmd == ['qiime', 'taxa', 'collapse',
+                    '--i-table', 'table.qza', '--i-taxonomy', 'taxo.qza',
+                    '--p-level', '6', '--o-collapsed-table', 'collapsed.qza']
+
+
+def test_relative_frequency(mock_run):
+    qiime_wrapper.relative_frequency('table.qza', 'rel.qza')
+    cmd = mock_run.call_args.args[0]
+    assert cmd == ['qiime', 'feature-table', 'relative-frequency',
+                    '--i-table', 'table.qza', '--o-relative-frequency-table', 'rel.qza']
+
+
+def test_classify_samples(mock_run):
+    qiime_wrapper.classify_samples('table.qza', 'meta.tsv', 'site', 'out_dir', cv=3)
+    cmd = mock_run.call_args.args[0]
+    assert cmd == ['qiime', 'sample-classifier', 'classify-samples',
+                    '--i-table', 'table.qza', '--m-metadata-file', 'meta.tsv',
+                    '--m-metadata-column', 'site', '--p-cv', '3',
+                    '--p-n-estimators', '100', '--output-dir', 'out_dir']
+
+
+def test_classify_samples_custom_n_estimators(mock_run):
+    qiime_wrapper.classify_samples('table.qza', 'meta.tsv', 'site', 'out_dir', cv=2, n_estimators=50)
+    cmd = mock_run.call_args.args[0]
+    assert cmd[cmd.index('--p-n-estimators') + 1] == '50'

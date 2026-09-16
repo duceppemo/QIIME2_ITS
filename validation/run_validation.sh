@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Runs qiime2-its and its classifier trainers (train_ncbi, train_fasta) end-to-
 # end against small, real, bundled fungal ITS datasets (paired-end, single-end,
-# read-length filtering, reverse-complement) to catch QIIME2/ITSxpress
-# interface breaks that the mocked-subprocess unit tests under tests/ cannot
-# -- those check that *our* code builds the right command, not that the
-# command still means the same thing in the QIIME2 version actually
-# installed, or that a real taxonomy database produces correct output.
+# read-length filtering, reverse-complement, a multi-sample/near-empty-sample
+# run exercising the advanced diversity/classifier/report steps) to catch
+# QIIME2/ITSxpress interface breaks that the mocked-subprocess unit tests
+# under tests/ cannot -- those check that *our* code builds the right command,
+# not that the command still means the same thing in the QIIME2 version
+# actually installed, or that a real taxonomy database produces correct output.
 #
 # Requires: an activated QIIME2 conda environment with this package installed
 # (`pip install -e .` from the repo root) and bbduk.sh (BBTools/BBMap) on
@@ -88,13 +89,15 @@ qiime2-its-train-fasta \
     -o "$OUT/classifier_fasta" \
     2>&1 | tee "$OUT/train_fasta.log"
 
+METADATA="$DATA/metadata.tsv"
+
 run_case () {
     local name="$1"; shift
     echo
     echo "== $name =="
     qiime2-its \
         -q "$QIIME2_ENV" \
-        -m "$DATA/metadata.tsv" \
+        -m "$METADATA" \
         -c "$CLASSIFIER" \
         -t 4 -p 2 \
         "$@" \
@@ -130,6 +133,18 @@ run_case fasta_classifier_classification \
     -i "$DATA/single_end" -o "$OUT/fasta_classifier_pipeline" -se --extract-its2 --taxa Fungi \
     --max-ee 4 --allow-one-off --sampling-depth 10 --max-rarefaction-depth 60
 CLASSIFIER="$saved_classifier"
+
+# 6 real samples (5 healthy + 1 near-empty, siteC-rep2, which DADA2 reduces
+# to a zero-read row) with a realistic multi-column metadata file, so the
+# advanced-stats/report steps (on by default) get exercised against >2
+# samples and the near-empty-sample edge case, not just the 2-sample/
+# 1-column metadata.tsv used above.
+saved_metadata="$METADATA"
+METADATA="$DATA/metadata_multi.tsv"
+run_case multi_sample_advanced_stats \
+    -i "$DATA/multi_sample" -o "$OUT/multi_sample_advanced_stats" -pe --extract-its2 --taxa Fungi \
+    --sampling-depth 10 --max-rarefaction-depth 15
+METADATA="$saved_metadata"
 
 run_unite_scenario () {
     # UNITE's own site now gates release files behind DOI/PlutoF landing

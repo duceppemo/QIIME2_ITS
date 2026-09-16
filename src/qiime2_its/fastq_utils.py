@@ -90,6 +90,18 @@ def _open_fastq(path, mode='rt'):
     return opener(path, mode)
 
 
+def is_empty_fastq(path):
+    """True if `path` contains zero fastq records.
+
+    Only reads the first line, so this is cheap even for large real files --
+    a zero-read sample otherwise fails several steps deep (ITSxpress's HMM
+    search errors out on an empty/misformatted input file) with a cryptic
+    external-tool stack trace instead of a clear, immediate message.
+    """
+    with _open_fastq(path, 'rt') as f:
+        return f.readline() == ''
+
+
 def iter_fastq_records(file_handle):
     """Yield (header, sequence, plus, quality) 4-tuples from an open fastq handle."""
     while True:

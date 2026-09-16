@@ -12,6 +12,9 @@ license = { file = "LICENSE" }
 authors = [{ name = "duceppemo" }]
 dependencies = [
     "biopython>=1.81",
+    "matplotlib>=3.7",
+    "pandas>=2.0",
+    "fpdf2>=2.7",
 ]
 
 [project.optional-dependencies]
