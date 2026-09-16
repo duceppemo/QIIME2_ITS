@@ -97,6 +97,20 @@ class _ReportPDF(FPDF):
                 self.cell(col_width, 6, self._fit_cell_text(str(value), col_width), border=1)
             self.ln()
 
+    def add_keyvalue_page(self, title, rows, label_width=45):
+        """A label/value list, one entry per line -- for QA/provenance
+        fields whose values vary too much in length for add_table_page's
+        fixed-width, truncate-if-too-long cells (a full file path or command
+        line must stay intact, not get an ellipsis)."""
+        self.add_page()
+        self.section_title(title)
+        for label, value in rows:
+            self.set_font('Helvetica', 'B', 9)
+            self.set_x(self.l_margin)
+            self.cell(label_width, 6, f'{label}:', new_x='RIGHT', new_y='TOP')
+            self.set_font('Helvetica', '', 9)
+            self.multi_cell(0, 6, str(value))
+
     def add_figure_page(self, title, fig, width=180):
         self.add_page()
         self.section_title(title)
@@ -122,6 +136,52 @@ def _split_beta_stem(stem):
         if stem.endswith(suffix):
             return stem[:-len(suffix)], metric
     return stem, ''
+
+
+# Already shown as their own rows on the "Run information" page -- excluded
+# from "Pipeline parameters" so the two pages don't just repeat each other.
+_PARAMETERS_SHOWN_ELSEWHERE = {'input', 'output', 'metadata', 'classifier', 'qiime2'}
+
+
+def _run_info_rows(run_metadata):
+    pipeline = run_metadata.get('pipeline', {})
+    env = run_metadata.get('environment', {})
+    inputs = run_metadata.get('inputs', {})
+    duration = pipeline.get('duration_seconds')
+    return [
+        ('Run started', pipeline.get('start_time', '')),
+        ('Run finished', pipeline.get('end_time', '')),
+        ('Run duration', f'{duration / 60:.1f} min' if duration is not None else ''),
+        ('Run by', f"{env.get('username', '')}@{env.get('hostname', '')}"),
+        ('Platform', env.get('platform', '')),
+        ('Conda environment', env.get('conda_env', '')),
+        ('qiime2-its version', pipeline.get('qiime2_its_version', '')),
+        ('QIIME2 framework version', env.get('qiime2_framework_version', '')),
+        ('Python version', env.get('python_version', '')),
+        ('Input folder', inputs.get('input_folder', '')),
+        ('Metadata file', inputs.get('metadata_file', '')),
+        ('Classifier file', inputs.get('classifier_file', '')),
+        ('Output folder', inputs.get('output_folder', '')),
+        ('Command invoked', pipeline.get('command_line', '')),
+    ]
+
+
+def _parameter_rows(run_metadata):
+    parameters = run_metadata.get('parameters', {})
+    return [[key.replace('_', '-'), value] for key, value in sorted(parameters.items())
+            if key not in _PARAMETERS_SHOWN_ELSEWHERE]
+
+
+def _sample_file_rows(run_metadata):
+    rows = []
+    for entry in run_metadata.get('inputs', {}).get('samples', []):
+        for filename in entry.get('files', []):
+            rows.append([entry.get('sample_id', ''), filename])
+    return rows
+
+
+def _plugin_rows(run_metadata):
+    return [[name, version] for name, version in sorted(run_metadata.get('qiime2_plugins', {}).items())]
 
 
 def _dada2_summary_table(output_folder):
@@ -226,6 +286,21 @@ def build_report(output_folder, metadata_file, report_column=None):
         if 'non-chimeric' in df.columns:
             summary_lines.append(f'Median non-chimeric reads/sample: {df["non-chimeric"].median():.0f}')
     pdf.add_title_page('QIIME2-ITS run summary', summary_lines, logo=_logo_bytes())
+
+    # 1b. Run provenance / QA -- absent for a report built from an output
+    # folder that predates this (or a run that crashed before it was written).
+    run_metadata = report_data.parse_run_metadata(output_folder / 'run_metadata.json')
+    if run_metadata is not None:
+        pdf.add_keyvalue_page('Run information', _run_info_rows(run_metadata))
+        parameter_rows = _parameter_rows(run_metadata)
+        if parameter_rows:
+            pdf.add_table_page('Pipeline parameters', ['parameter', 'value'], parameter_rows)
+        sample_rows = _sample_file_rows(run_metadata)
+        if sample_rows:
+            pdf.add_table_page('Input sample files', ['sample', 'file'], sample_rows)
+        plugin_rows = _plugin_rows(run_metadata)
+        if plugin_rows:
+            pdf.add_table_page('Installed QIIME2 plugins', ['plugin', 'version'], plugin_rows)
 
     # 2. DADA2 retention table
     if dada2 is not None:

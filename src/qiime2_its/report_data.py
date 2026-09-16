@@ -262,3 +262,15 @@ def build_genus_abundance_table(biom_tsv_path, top_n=10):
     if other.sum() > 0:
         result.loc['Other'] = other
     return result
+
+
+def parse_run_metadata(run_metadata_json_path):
+    """Parse run_metadata.json (written by cli/pipeline.py via
+    provenance.write_run_metadata()) into a plain dict, or None if it
+    doesn't exist -- e.g. an output folder from before this existed, or one
+    the pipeline never finished writing to."""
+    try:
+        with open(run_metadata_json_path) as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return None

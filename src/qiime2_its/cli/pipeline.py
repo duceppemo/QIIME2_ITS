@@ -3,17 +3,26 @@ filter -> DADA2 denoise -> phylogeny -> diversity -> taxonomy -> barplot ->
 (optional) diversity/composition/classifier stats -> (optional) PDF report.
 """
 import argparse
+import getpass
+import platform
+import shlex
+import socket
 import subprocess
+import sys
+from datetime import datetime
 from pathlib import Path
 
-from qiime2_its import (biom_utils, env_checks, fastq_utils, itsxpress_wrapper, metadata_utils, qiime_wrapper,
-                         report, report_data, size_filter, taxonomy)
+from qiime2_its import (biom_utils, env_checks, fastq_utils, itsxpress_wrapper, metadata_utils, provenance,
+                         qiime_wrapper, report, report_data, size_filter, taxonomy)
 from qiime2_its._version import __version__
 from qiime2_its.itsxpress_wrapper import TAXA_CODES
 
 
 class Pipeline:
     def __init__(self, args):
+        self.start_time = datetime.now().astimezone()
+        self.cli_args = vars(args)
+
         self.input_folder = Path(args.input)
         self.qiime2_classifier = args.classifier
         self.metadata_file = args.metadata
@@ -170,6 +179,9 @@ class Pipeline:
         if not self.skip_advanced_stats:
             self._run_advanced_stats(table_qza, taxonomy_qza)
 
+        print('Writing run provenance metadata...')
+        self._write_run_metadata()
+
         if not self.skip_report:
             print('Building PDF report...')
             report_path = report.build_report(self.output_folder, self.metadata_file, self.report_column)
@@ -251,6 +263,31 @@ class Pipeline:
                                                 cv=min(5, smallest_class))
             except subprocess.CalledProcessError:
                 print(f'\tSkipping classifier for "{column}": training failed (see the QIIME2 error above).')
+
+    def _write_run_metadata(self):
+        """Writes run_metadata.json: who ran this, when, with what exact
+        command/parameters/inputs, against which QIIME2/plugin versions --
+        for QA/audit purposes and for the PDF report's provenance pages.
+        Written even with --skip-report, so it's available without one.
+        """
+        run_metadata = provenance.build_run_metadata(
+            qiime2_its_version=__version__,
+            command_line=shlex.join(sys.argv),
+            start_time=self.start_time,
+            end_time=datetime.now().astimezone(),
+            username=getpass.getuser(),
+            hostname=socket.gethostname(),
+            platform_string=platform.platform(),
+            conda_env=self.qiime2_env,
+            qiime_info_text=qiime_wrapper.qiime_info(),
+            input_folder=self.input_folder,
+            metadata_file=self.metadata_file,
+            classifier_file=self.qiime2_classifier,
+            output_folder=self.output_folder,
+            sample_dict=self.sample_dict,
+            parameters=self.cli_args,
+        )
+        provenance.write_run_metadata(self.output_folder / 'run_metadata.json', run_metadata)
 
     def _import(self, fastq_folder, output_qza):
         if self.paired:

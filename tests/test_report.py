@@ -102,6 +102,8 @@ def _build_synthetic_output_folder(tmp_path):
                            'x\tA\tB\tOverall Accuracy\nA\t1.0\t0.0\t\nB\t0.0\t1.0\t\n'
                            'Overall Accuracy\t\t\t0.75\nBaseline Accuracy\t\t\t0.5\nAccuracy Ratio\t\t\t1.5\n')
 
+    (out / 'run_metadata.json').write_text(json.dumps(_SAMPLE_RUN_METADATA))
+
     metadata_path = tmp_path / 'metadata.tsv'
     metadata_path.write_text(
         'sample-id\tsite\n#q2:types\tcategorical\n'
@@ -149,6 +151,52 @@ class TestFitCellText:
         assert fitted != long_text
         assert fitted.endswith('...')
         assert pdf.get_string_width(fitted) <= 30 - 2 * pdf.c_margin
+
+
+_SAMPLE_RUN_METADATA = {
+    'pipeline': {
+        'qiime2_its_version': '0.2.0',
+        'command_line': 'qiime2-its -q rachis-qiime2-2026.7 -i in -o out -m meta.tsv -c clf.qza -pe',
+        'start_time': '2026-09-16T12:00:00+00:00',
+        'end_time': '2026-09-16T12:02:30+00:00',
+        'duration_seconds': 150.0,
+    },
+    'environment': {
+        'username': 'bioinfo', 'hostname': 'workstation', 'platform': 'Linux-x86_64',
+        'conda_env': 'rachis-qiime2-2026.7', 'python_version': '3.12.13',
+        'qiime2_framework_version': '2026.7.0',
+    },
+    'qiime2_plugins': {'dada2': '2026.7.0', 'itsxpress': '2.2.0'},
+    'inputs': {
+        'input_folder': '/in', 'metadata_file': 'meta.tsv', 'classifier_file': 'clf.qza',
+        'output_folder': '/out',
+        'samples': [{'sample_id': 'sampleA', 'files': ['sampleA_S1_L001_R1_001.fastq.gz']}],
+    },
+    'parameters': {'max_ee': 4.0, 'allow_one_off': True, 'input': '/in', 'qiime2': 'rachis-qiime2-2026.7'},
+}
+
+
+class TestRunMetadataRows:
+    def test_run_info_rows_includes_key_qa_fields(self):
+        rows = dict(report._run_info_rows(_SAMPLE_RUN_METADATA))
+        assert rows['Run by'] == 'bioinfo@workstation'
+        assert rows['QIIME2 framework version'] == '2026.7.0'
+        assert rows['Run duration'] == '2.5 min'
+        assert 'qiime2-its' in rows['Command invoked']
+
+    def test_parameter_rows_excludes_fields_shown_on_run_info_page(self):
+        rows = report._parameter_rows(_SAMPLE_RUN_METADATA)
+        keys = [row[0] for row in rows]
+        assert 'input' not in keys
+        assert 'qiime2' not in keys
+        assert ['max-ee', 4.0] in rows
+        assert ['allow-one-off', True] in rows
+
+    def test_sample_file_rows_one_row_per_file(self):
+        assert report._sample_file_rows(_SAMPLE_RUN_METADATA) == [['sampleA', 'sampleA_S1_L001_R1_001.fastq.gz']]
+
+    def test_plugin_rows_sorted(self):
+        assert report._plugin_rows(_SAMPLE_RUN_METADATA) == [['dada2', '2026.7.0'], ['itsxpress', '2.2.0']]
 
 
 class TestBuildReport:

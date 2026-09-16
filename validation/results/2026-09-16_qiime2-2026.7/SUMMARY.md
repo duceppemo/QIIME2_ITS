@@ -116,3 +116,25 @@ collapse correctly fell back to level 5, the `replicate` column's classifier tra
 `site`/`host-plant`/`collection-date` were correctly skipped with a clear reason, and `report.pdf`
 (10 pages) rendered every section with real data -- individually confirmed by rendering each page to
 PNG and inspecting it, not just checking the file exists.
+
+## Third pass this same day: QA/provenance metadata
+
+Added `run_metadata.json` (written unconditionally, even with `--skip-report`) and four new report
+pages -- Run information (start/end/duration, user@host, platform, conda env, qiime2-its/QIIME2
+versions, input/metadata/classifier/output paths, the exact command invoked), Pipeline parameters
+(every CLI flag's value), Input sample files (one row per fastq file), and Installed QIIME2 plugins
+(every plugin `qiime info` reports, name + version) -- for run-to-run QA/audit purposes.
+
+One real bug found and fixed via this pass's real-data run (not present in a mocked-subprocess unit
+test, since `qiime info` was never called before): the beta-group-significance table fix from
+earlier today established `add_table_page()` truncates any cell too wide for its column, which is
+correct for short values but wrong for this page's file-path/command-line values -- silently
+dropping part of a path would defeat the point of a QA record. Added `add_keyvalue_page()` (a
+label + wrapping `multi_cell()` value, never truncated) instead of reusing `add_table_page()` for
+the Run information page; verified by regenerating the report against a real 8.4-minute
+`paired_end` run with a long absolute output path and inspecting the rendered page directly (full
+path visible, wrapped onto a second line, nothing cut off).
+
+Re-ran the full `run_validation.sh` suite (all 6 `qiime2-its` scenarios plus `train_ncbi`/
+`train_fasta`) to confirm `run_metadata.json` is written and the new pages render across every
+scenario, not just the one manually inspected; refreshed this directory's `.log` files to match.

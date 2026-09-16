@@ -186,3 +186,10 @@ def test_classify_samples_custom_n_estimators(mock_run):
     qiime_wrapper.classify_samples('table.qza', 'meta.tsv', 'site', 'out_dir', cv=2, n_estimators=50)
     cmd = mock_run.call_args.args[0]
     assert cmd[cmd.index('--p-n-estimators') + 1] == '50'
+
+
+def test_qiime_info(mock_run):
+    mock_run.return_value.stdout = 'System versions\nPython version: 3.12.13\n'
+    result = qiime_wrapper.qiime_info()
+    mock_run.assert_called_once_with(['qiime', 'info'], check=True, capture_output=True, text=True)
+    assert result == 'System versions\nPython version: 3.12.13\n'

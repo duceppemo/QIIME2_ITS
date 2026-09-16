@@ -20,14 +20,31 @@ taxonomy → barplot), `qiime2-its` also runs:
    nominally eligible but still too small for scikit-learn's internal stratified split (e.g. one
    category has only one non-zero-read sample) is caught and skipped with a message, not fatal to
    the run.
-5. **A PDF report** (`<output>/report.pdf`): run summary, DADA2 read retention table, alpha
-   diversity group-significance table + boxplots, beta diversity group-significance table + PCoA
-   plots (Bray-Curtis and unweighted UniFrac), genus-level relative-abundance chart, the
-   rarefaction curve, and sample-classifier accuracy (if any column succeeded). Built with
-   matplotlib + [fpdf2](https://pypi.org/project/fpdf2/) — no LaTeX, no browser rendering, no
-   heavy system dependencies. It discovers what to include by scanning the output folder for
-   whichever of the artifacts above were actually produced, so it degrades gracefully if you pass
-   `--skip-advanced-stats`.
+5. **A PDF report** (`<output>/report.pdf`): run summary, QA/provenance pages (see below), DADA2
+   read retention table, alpha diversity group-significance table + boxplots, beta diversity
+   group-significance table + PCoA plots (Bray-Curtis and unweighted UniFrac), genus-level
+   relative-abundance chart, the rarefaction curve, and sample-classifier accuracy (if any column
+   succeeded). Built with matplotlib + [fpdf2](https://pypi.org/project/fpdf2/) — no LaTeX, no
+   browser rendering, no heavy system dependencies. It discovers what to include by scanning the
+   output folder for whichever of the artifacts above were actually produced, so it degrades
+   gracefully if you pass `--skip-advanced-stats`.
+
+## QA / provenance
+
+Every run writes `<output>/run_metadata.json` — regardless of `--skip-report` — recording:
+
+- when the run started/finished and how long it took
+- who ran it and on which machine (username, hostname, platform)
+- the exact command invoked, and every CLI parameter's value
+- the input folder, metadata file, classifier file, and output folder used
+- every input fastq file, grouped by sample
+- the QIIME2 framework version and every installed plugin's version (`qiime info`, captured at
+  run time)
+
+If `report.pdf` is built, this becomes four pages near the front — Run information, Pipeline
+parameters, Input sample files, and Installed QIIME2 plugins — before the diversity/composition
+results. A report built from an older output folder that predates this (or one missing
+`run_metadata.json` for any other reason) just skips those pages rather than failing.
 
 ## A near-empty sample
 
@@ -57,5 +74,6 @@ want the group-significance/classifier artifacts but not the report, or vice ver
   sample-classifier-<column>/                    # one per eligible, non-skipped column
   dada2_stats/, sample_frequencies/               # plain-text exports the report reads
   core-metrics-results/<metric>_pcoa_export/      # plain-text PCoA exports the report reads
+  run_metadata.json                              # QA/provenance record, see above
   report.pdf
 ```

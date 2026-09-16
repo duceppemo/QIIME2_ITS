@@ -231,3 +231,13 @@ class TestBuildGenusAbundanceTable:
         assert len(table) == 11  # top 10 + Other
         assert 'Other' in table.index
         assert table['sampleA'].sum() == pytest.approx(1.0)
+
+
+class TestParseRunMetadata:
+    def test_parses_written_json(self, tmp_path):
+        path = tmp_path / 'run_metadata.json'
+        path.write_text('{"pipeline": {"qiime2_its_version": "0.2.0"}}')
+        assert report_data.parse_run_metadata(path) == {'pipeline': {'qiime2_its_version': '0.2.0'}}
+
+    def test_returns_none_when_missing(self, tmp_path):
+        assert report_data.parse_run_metadata(tmp_path / 'does-not-exist.json') is None

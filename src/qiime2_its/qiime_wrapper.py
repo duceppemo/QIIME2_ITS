@@ -266,3 +266,10 @@ def classify_samples(table_qza, metadata_file, column, output_dir, cv, n_estimat
            '--p-n-estimators', str(n_estimators),
            '--output-dir', str(output_dir)]
     _run(cmd)
+
+
+def qiime_info():
+    """Returns `qiime info`'s raw stdout: framework/Python versions and every
+    installed plugin's version. Used for the report's QA/provenance pages
+    (provenance.parse_qiime_info() does the actual parsing)."""
+    return subprocess.run(['qiime', 'info'], check=True, capture_output=True, text=True).stdout
