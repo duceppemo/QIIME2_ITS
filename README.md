@@ -21,7 +21,7 @@
 
 ```bash
 # Inside an activated QIIME2 conda environment (see the wiki for full setup):
-conda install -c bioconda -c conda-forge itsxpress
+conda install -c bioconda -c conda-forge itsxpress bbmap
 qiime dev refresh-cache
 
 git clone https://github.com/duceppemo/QIIME2_ITS

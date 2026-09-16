@@ -12,11 +12,14 @@
        --file https://raw.githubusercontent.com/qiime2/distributions/dev/$VERSION/qiime2/released/rachis-qiime2-linux-64-conda.yml
    ```
 
-3. Activate the environment and install ITSxpress (this also registers the `qiime itsxpress` plugin
-   used by this pipeline) plus this package:
+3. Activate the environment and install ITSxpress (this also registers the `qiime itsxpress`
+   plugin used by this pipeline) and BBTools/BBMap (provides `bbduk.sh`, used for
+   `--min-len`/`--max-len` read-length filtering and by `validation/run_validation.sh` -- see
+   [Validation suite](Validation-Suite)). Neither is installed by the QIIME2 environment file
+   itself, so both are worth installing upfront rather than hitting a missing-tool error later:
    ```bash
    conda activate rachis-qiime2-2026.7   # name may differ depending on when you installed it
-   conda install -c bioconda -c conda-forge itsxpress
+   conda install -c bioconda -c conda-forge itsxpress bbmap
    qiime dev refresh-cache                # picks up the newly installed itsxpress plugin
 
    git clone https://github.com/duceppemo/QIIME2_ITS
@@ -25,15 +28,6 @@
 
    # Test the pipeline:
    qiime2-its -h
-   ```
-
-4. Only if you plan to use `--min-len`/`--max-len` (read-length filtering) -- or want to run
-   `validation/run_validation.sh` (see [Validation suite](Validation-Suite)), which exercises that
-   path -- install BBTools/BBMap, which provides `bbduk.sh`. It is **not** installed by the QIIME2
-   environment file and `qiime2-its` will refuse to start with `--min-len`/`--max-len` until it's on
-   `PATH`:
-   ```bash
-   conda install -c bioconda -c conda-forge bbmap
    ```
 
 Next: [build a classifier](Building-a-Classifier), then see [Pipeline usage](Pipeline-Usage).

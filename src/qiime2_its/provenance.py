@@ -11,9 +11,11 @@ only subprocess call this depends on (`qiime info`) happens in
 qiime_wrapper.py, which just hands this module the raw text to parse.
 """
 import json
+import re
 from pathlib import Path
 
 _QIIME_INFO_SECTION_HEADERS = {'System versions': 'system', 'Installed plugins': 'plugins'}
+_BBDUK_VERSION_RE = re.compile(r'BBTools version (\S+)')
 
 
 def parse_qiime_info(text):
@@ -47,6 +49,17 @@ def parse_qiime_info(text):
     return {'system': system, 'plugins': plugins}
 
 
+def parse_bbduk_version(text):
+    """Extract "39.80" from BBTools' "BBTools version 39.80" banner (its
+    `--version` output, which is on stderr -- see size_filter.bbduk_version()).
+    None if `text` is None (bbduk.sh isn't installed) or doesn't match.
+    """
+    if not text:
+        return None
+    match = _BBDUK_VERSION_RE.search(text)
+    return match.group(1) if match else None
+
+
 def sample_file_manifest(sample_dict):
     """{sample: [Path, ...]} -> [{'sample_id': ..., 'files': [name, ...]}, ...], sorted by sample."""
     return [
@@ -57,14 +70,18 @@ def sample_file_manifest(sample_dict):
 
 def build_run_metadata(*, qiime2_its_version, command_line, start_time, end_time,
                         username, hostname, platform_string, conda_env, qiime_info_text,
-                        input_folder, metadata_file, classifier_file, output_folder,
-                        sample_dict, parameters):
+                        bbduk_version_text, input_folder, metadata_file, classifier_file,
+                        output_folder, sample_dict, parameters):
     """Assemble one JSON-serializable provenance record for this run.
 
     `start_time`/`end_time` are timezone-aware datetimes; `qiime_info_text`
     is `qiime info`'s raw stdout (parsed here via parse_qiime_info());
-    `parameters` is the run's CLI arguments as a plain dict (e.g.
-    vars(argparse.Namespace)), stored as-is for exact reproducibility.
+    `bbduk_version_text` is `bbduk.sh --version`'s raw stderr, or None if it
+    isn't installed (parsed via parse_bbduk_version() -- BBTools/BBMap is an
+    external, non-QIIME2 dependency `qiime info` doesn't know about, only
+    needed for --min-len/--max-len); `parameters` is the run's CLI arguments
+    as a plain dict (e.g. vars(argparse.Namespace)), stored as-is for exact
+    reproducibility.
     """
     qiime_info = parse_qiime_info(qiime_info_text)
     return {
@@ -83,6 +100,7 @@ def build_run_metadata(*, qiime2_its_version, command_line, start_time, end_time
             'python_version': qiime_info['system'].get('Python version'),
             'qiime2_framework_version': qiime_info['system'].get('rachis version')
             or qiime_info['system'].get('q2cli version'),
+            'bbmap_version': parse_bbduk_version(bbduk_version_text),
         },
         'qiime2_plugins': qiime_info['plugins'],
         'inputs': {

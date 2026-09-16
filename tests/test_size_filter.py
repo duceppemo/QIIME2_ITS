@@ -37,3 +37,14 @@ def test_size_select_pe_includes_both_mates(mock_run):
     assert 'in=r1.fastq.gz' in cmd
     assert 'in2=r2.fastq.gz' in cmd
     assert any(arg.startswith('out2=') for arg in cmd)
+
+
+def test_bbduk_version_returns_stderr(mock_run):
+    mock_run.return_value.stderr = 'BBTools version 39.80\n'
+    assert size_filter.bbduk_version() == 'BBTools version 39.80\n'
+    mock_run.assert_called_once_with(['bbduk.sh', '--version'], capture_output=True, text=True)
+
+
+def test_bbduk_version_none_when_not_installed(mocker):
+    mocker.patch('qiime2_its.size_filter.subprocess.run', side_effect=FileNotFoundError)
+    assert size_filter.bbduk_version() is None

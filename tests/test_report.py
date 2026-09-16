@@ -164,7 +164,7 @@ _SAMPLE_RUN_METADATA = {
     'environment': {
         'username': 'bioinfo', 'hostname': 'workstation', 'platform': 'Linux-x86_64',
         'conda_env': 'rachis-qiime2-2026.7', 'python_version': '3.12.13',
-        'qiime2_framework_version': '2026.7.0',
+        'qiime2_framework_version': '2026.7.0', 'bbmap_version': '39.80',
     },
     'qiime2_plugins': {'dada2': '2026.7.0', 'itsxpress': '2.2.0'},
     'inputs': {
@@ -183,6 +183,13 @@ class TestRunMetadataRows:
         assert rows['QIIME2 framework version'] == '2026.7.0'
         assert rows['Run duration'] == '2.5 min'
         assert 'qiime2-its' in rows['Command invoked']
+        assert rows['BBMap (bbduk.sh) version'] == '39.80'
+
+    def test_run_info_rows_reports_bbmap_not_installed(self):
+        metadata = {**_SAMPLE_RUN_METADATA,
+                     'environment': {**_SAMPLE_RUN_METADATA['environment'], 'bbmap_version': None}}
+        rows = dict(report._run_info_rows(metadata))
+        assert rows['BBMap (bbduk.sh) version'] == 'not installed'
 
     def test_parameter_rows_excludes_fields_shown_on_run_info_page(self):
         rows = report._parameter_rows(_SAMPLE_RUN_METADATA)

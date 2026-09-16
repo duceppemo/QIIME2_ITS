@@ -34,6 +34,26 @@ Getting help
 To find help and learning resources, visit https://qiime2.org.
 """
 
+# Verbatim shape of real `bbduk.sh --version` output (written to stderr, not stdout).
+_REAL_BBDUK_VERSION_TEXT = (
+    'java -ea  --add-modules jdk.incubator.vector -Xmx95681m -Xms95681m '
+    '-cp /opt/bbmap-39.80-0/bbtools.jar bbduk.BBDukS --version\n'
+    'WARNING: Using incubator modules: jdk.incubator.vector\n'
+    'BBTools version 39.80\n'
+    'For help, please run the shellscript with no parameters, or look in /docs/.\n'
+)
+
+
+class TestParseBbdukVersion:
+    def test_extracts_version_number(self):
+        assert provenance.parse_bbduk_version(_REAL_BBDUK_VERSION_TEXT) == '39.80'
+
+    def test_none_when_not_installed(self):
+        assert provenance.parse_bbduk_version(None) is None
+
+    def test_none_when_text_does_not_match(self):
+        assert provenance.parse_bbduk_version('command not found') is None
+
 
 class TestParseQiimeInfo:
     def test_parses_system_versions(self):
@@ -83,6 +103,7 @@ class TestBuildRunMetadata:
             username='bioinfo', hostname='workstation',
             platform_string='Linux-x86_64', conda_env='rachis-qiime2-2026.7',
             qiime_info_text=_REAL_QIIME_INFO_TEXT,
+            bbduk_version_text=_REAL_BBDUK_VERSION_TEXT,
             input_folder='/in', metadata_file='meta.tsv', classifier_file='clf.qza',
             output_folder='/out',
             sample_dict={'sampleA': ['/in/sampleA_S1_L001_R1_001.fastq.gz']},
@@ -96,6 +117,12 @@ class TestBuildRunMetadata:
 
     def test_pulls_framework_version_from_qiime_info(self):
         assert self._build()['environment']['qiime2_framework_version'] == '2026.7.0'
+
+    def test_pulls_bbmap_version(self):
+        assert self._build()['environment']['bbmap_version'] == '39.80'
+
+    def test_bbmap_version_none_when_not_installed(self):
+        assert self._build(bbduk_version_text=None)['environment']['bbmap_version'] is None
 
     def test_carries_plugin_versions_through(self):
         assert self._build()['qiime2_plugins']['dada2'] == '2026.7.0'

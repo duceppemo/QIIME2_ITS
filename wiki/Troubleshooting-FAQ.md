@@ -6,8 +6,9 @@ The naming scheme splits on every underscore and needs exactly 5 fields — use 
 (`siteA-rep1_...`). See [Metadata and fastq naming requirements](Metadata-and-FASTQ-Requirements).
 
 **"bbduk.sh not found on PATH."**
-`--min-len`/`--max-len` need BBTools/BBMap, which the QIIME2 environment file does not install:
-`conda install -c bioconda -c conda-forge bbmap`. See [Installation](Installation).
+`--min-len`/`--max-len` need BBTools/BBMap, which the QIIME2 environment file does not install.
+[Installation](Installation)'s setup command installs it alongside ITSxpress; if you skipped that
+or set up your environment another way: `conda install -c bioconda -c conda-forge bbmap`.
 
 **"The following sample(s) have an empty (zero-read) fastq file."**
 A sample with zero reads is rejected upfront with a clear message rather than failing several

@@ -280,6 +280,7 @@ class Pipeline:
             platform_string=platform.platform(),
             conda_env=self.qiime2_env,
             qiime_info_text=qiime_wrapper.qiime_info(),
+            bbduk_version_text=size_filter.bbduk_version(),
             input_folder=self.input_folder,
             metadata_file=self.metadata_file,
             classifier_file=self.qiime2_classifier,

@@ -4,6 +4,20 @@ from concurrent import futures
 from pathlib import Path
 
 
+def bbduk_version():
+    """Returns `bbduk.sh --version`'s raw stderr text (BBTools writes its
+    version banner there, not stdout), or None if bbduk.sh isn't installed
+    -- it's optional, only needed for --min-len/--max-len. Used for the
+    report's QA/provenance page (provenance.parse_bbduk_version() does the
+    actual parsing).
+    """
+    try:
+        result = subprocess.run(['bbduk.sh', '--version'], capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+    return result.stderr
+
+
 def size_select_se(fastq_in, out_folder, min_len, max_len, threads):
     out_path = Path(out_folder) / Path(fastq_in).name
     cmd = ['bbduk.sh', 'overwrite=t',

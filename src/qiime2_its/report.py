@@ -157,6 +157,7 @@ def _run_info_rows(run_metadata):
         ('Conda environment', env.get('conda_env', '')),
         ('qiime2-its version', pipeline.get('qiime2_its_version', '')),
         ('QIIME2 framework version', env.get('qiime2_framework_version', '')),
+        ('BBMap (bbduk.sh) version', env.get('bbmap_version') or 'not installed'),
         ('Python version', env.get('python_version', '')),
         ('Input folder', inputs.get('input_folder', '')),
         ('Metadata file', inputs.get('metadata_file', '')),
