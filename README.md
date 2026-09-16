@@ -64,6 +64,13 @@ please report an issue.
    qiime2-its -h
    ```
 
+4. Only if you plan to use `--min-len`/`--max-len` (read-length filtering): install BBTools/BBMap,
+   which provides `bbduk.sh`. It is **not** installed by the QIIME2 environment file and `qiime2-its`
+   will refuse to start with `--min-len`/`--max-len` until it's on `PATH`:
+   ```bash
+   conda install -c bioconda -c conda-forge bbmap
+   ```
+
 ## Database
 You need a QIIME2 classifier to run this pipeline. If you update your QIIME2 version, you will
 generally need to recompile the classifier.

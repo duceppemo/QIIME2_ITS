@@ -42,3 +42,19 @@ class TestCheckQiime2EnvActive:
     def test_accepts_rachis_naming(self, monkeypatch):
         monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
         assert env_checks.check_qiime2_env_active() == 'rachis-qiime2-2026.7'
+
+
+class TestCheckExecutable:
+    def test_raises_with_hint_when_missing(self, mocker):
+        mocker.patch('qiime2_its.env_checks.shutil.which', return_value=None)
+        with pytest.raises(EnvironmentError, match='bbduk.sh.*Install BBTools'):
+            env_checks.check_executable('bbduk.sh', 'Install BBTools/BBMap.')
+
+    def test_raises_without_hint_when_missing(self, mocker):
+        mocker.patch('qiime2_its.env_checks.shutil.which', return_value=None)
+        with pytest.raises(EnvironmentError):
+            env_checks.check_executable('bbduk.sh')
+
+    def test_does_not_raise_when_present(self, mocker):
+        mocker.patch('qiime2_its.env_checks.shutil.which', return_value='/usr/bin/bbduk.sh')
+        env_checks.check_executable('bbduk.sh')  # no raise

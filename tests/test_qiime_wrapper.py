@@ -53,17 +53,51 @@ def test_import_fastq_pe(mock_run):
 
 
 def test_dada2_denoise_single_no_trimming(mock_run):
-    qiime_wrapper.dada2_denoise_single('r.qza', 'rep.qza', 't.qza', 's.qza')
+    qiime_wrapper.dada2_denoise_single('r.qza', 'rep.qza', 't.qza', 's.qza', 'bts.qza')
     cmd = mock_run.call_args.args[0]
     assert '--p-trim-left' in cmd and cmd[cmd.index('--p-trim-left') + 1] == '0'
     assert '--p-trunc-len' in cmd and cmd[cmd.index('--p-trunc-len') + 1] == '0'
+    assert '--o-base-transition-stats' in cmd and cmd[cmd.index('--o-base-transition-stats') + 1] == 'bts.qza'
 
 
 def test_dada2_denoise_paired_no_trimming(mock_run):
-    qiime_wrapper.dada2_denoise_paired('r.qza', 'rep.qza', 't.qza', 's.qza')
+    qiime_wrapper.dada2_denoise_paired('r.qza', 'rep.qza', 't.qza', 's.qza', 'bts.qza')
     cmd = mock_run.call_args.args[0]
     for flag in ('--p-trim-left-f', '--p-trim-left-r', '--p-trunc-len-f', '--p-trunc-len-r'):
         assert flag in cmd and cmd[cmd.index(flag) + 1] == '0'
+    assert '--o-base-transition-stats' in cmd and cmd[cmd.index('--o-base-transition-stats') + 1] == 'bts.qza'
+
+
+def test_dada2_denoise_single_defaults_match_qiime2(mock_run):
+    qiime_wrapper.dada2_denoise_single('r.qza', 'rep.qza', 't.qza', 's.qza', 'bts.qza')
+    cmd = mock_run.call_args.args[0]
+    assert cmd[cmd.index('--p-max-ee') + 1] == '2.0'
+    assert cmd[cmd.index('--p-trunc-q') + 1] == '2'
+    assert cmd[cmd.index('--p-pooling-method') + 1] == 'independent'
+    assert cmd[cmd.index('--p-chimera-method') + 1] == 'consensus'
+    assert '--p-no-allow-one-off' in cmd
+
+
+def test_dada2_denoise_single_ion_torrent_style_overrides(mock_run):
+    qiime_wrapper.dada2_denoise_single('r.qza', 'rep.qza', 't.qza', 's.qza', 'bts.qza',
+                                        max_ee=5.0, allow_one_off=True)
+    cmd = mock_run.call_args.args[0]
+    assert cmd[cmd.index('--p-max-ee') + 1] == '5.0'
+    assert '--p-allow-one-off' in cmd
+    assert '--p-no-allow-one-off' not in cmd
+
+
+def test_dada2_denoise_paired_uses_separate_max_ee_per_direction(mock_run):
+    qiime_wrapper.dada2_denoise_paired('r.qza', 'rep.qza', 't.qza', 's.qza', 'bts.qza', max_ee_f=1.0, max_ee_r=3.0)
+    cmd = mock_run.call_args.args[0]
+    assert cmd[cmd.index('--p-max-ee-f') + 1] == '1.0'
+    assert cmd[cmd.index('--p-max-ee-r') + 1] == '3.0'
+
+
+def test_core_diversity_sampling_depth_override(mock_run):
+    qiime_wrapper.core_diversity(4, 'metadata.tsv', 'rooted.qza', 'table.qza', 'out', sampling_depth=50)
+    cmd = mock_run.call_args.args[0]
+    assert cmd[cmd.index('--p-sampling-depth') + 1] == '50'
 
 
 def test_core_diversity_actually_runs(mock_run):
@@ -81,9 +115,18 @@ def test_all_wrapper_calls_use_check_true(mock_run):
     assert mock_run.call_args.kwargs.get('check') is True
 
 
+def test_sample_summarize(mock_run):
+    qiime_wrapper.sample_summarize('meta.tsv', 'table.qza', 'table.qzv', 'ff.qza', 'sf.qza')
+    cmd = mock_run.call_args.args[0]
+    assert cmd == ['qiime', 'feature-table', 'summarize',
+                    '--m-metadata-file', 'meta.tsv', '--i-table', 'table.qza',
+                    '--o-summary', 'table.qzv', '--o-feature-frequencies', 'ff.qza',
+                    '--o-sample-frequencies', 'sf.qza']
+
+
 def test_classify(mock_run):
     qiime_wrapper.classify('clf.qza', 'rep.qza', 'taxo.qza')
     cmd = mock_run.call_args.args[0]
     assert cmd == ['qiime', 'feature-classifier', 'classify-sklearn',
-                    '--p-n-jobs', '-1', '--i-classifier', 'clf.qza',
+                    '--p-n-jobs', '0', '--i-classifier', 'clf.qza',
                     '--i-reads', 'rep.qza', '--o-classification', 'taxo.qza']

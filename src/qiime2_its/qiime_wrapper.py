@@ -72,29 +72,57 @@ def demux_summary(reads_qza, output_qzv, n=1000):
     _run(cmd)
 
 
-def dada2_denoise_single(reads_qza, repseq_qza, table_qza, stats_qza, n_threads=0):
+# Defaults match `qiime dada2 denoise-single/-paired`'s own defaults, tuned for
+# Illumina data. Override max_ee/allow_one_off in particular for noisier
+# single-end platforms (e.g. IonTorrent): its higher per-base error rate and
+# homopolymer-driven indels mean more legitimate reads get discarded by the
+# default max-expected-errors threshold, and more true ASVs get miscalled as
+# one-off bimeras by the default (non-one-off) chimera search.
+def dada2_denoise_single(reads_qza, repseq_qza, table_qza, stats_qza, base_transition_stats_qza, n_threads=0,
+                          max_ee=2.0, trunc_q=2, pooling_method='independent', chimera_method='consensus',
+                          min_fold_parent_over_abundance=1.0, allow_one_off=False, n_reads_learn=1000000):
     cmd = ['qiime', 'dada2', 'denoise-single',
            '--p-n-threads', str(n_threads),
            '--p-trim-left', '0',
            '--p-trunc-len', '0',
+           '--p-max-ee', str(max_ee),
+           '--p-trunc-q', str(trunc_q),
+           '--p-pooling-method', pooling_method,
+           '--p-chimera-method', chimera_method,
+           '--p-min-fold-parent-over-abundance', str(min_fold_parent_over_abundance),
+           '--p-allow-one-off' if allow_one_off else '--p-no-allow-one-off',
+           '--p-n-reads-learn', str(n_reads_learn),
            '--i-demultiplexed-seqs', str(reads_qza),
            '--o-representative-sequences', str(repseq_qza),
            '--o-table', str(table_qza),
-           '--o-denoising-stats', str(stats_qza)]
+           '--o-denoising-stats', str(stats_qza),
+           '--o-base-transition-stats', str(base_transition_stats_qza)]
     _run(cmd)
 
 
-def dada2_denoise_paired(reads_qza, repseq_qza, table_qza, stats_qza, n_threads=0):
+def dada2_denoise_paired(reads_qza, repseq_qza, table_qza, stats_qza, base_transition_stats_qza, n_threads=0,
+                          max_ee_f=2.0, max_ee_r=2.0, trunc_q=2, pooling_method='independent',
+                          chimera_method='consensus', min_fold_parent_over_abundance=1.0, allow_one_off=False,
+                          n_reads_learn=1000000):
     cmd = ['qiime', 'dada2', 'denoise-paired',
            '--p-n-threads', str(n_threads),
            '--p-trim-left-f', '0',
            '--p-trim-left-r', '0',
            '--p-trunc-len-f', '0',
            '--p-trunc-len-r', '0',
+           '--p-max-ee-f', str(max_ee_f),
+           '--p-max-ee-r', str(max_ee_r),
+           '--p-trunc-q', str(trunc_q),
+           '--p-pooling-method', pooling_method,
+           '--p-chimera-method', chimera_method,
+           '--p-min-fold-parent-over-abundance', str(min_fold_parent_over_abundance),
+           '--p-allow-one-off' if allow_one_off else '--p-no-allow-one-off',
+           '--p-n-reads-learn', str(n_reads_learn),
            '--i-demultiplexed-seqs', str(reads_qza),
            '--o-representative-sequences', str(repseq_qza),
            '--o-table', str(table_qza),
-           '--o-denoising-stats', str(stats_qza)]
+           '--o-denoising-stats', str(stats_qza),
+           '--o-base-transition-stats', str(base_transition_stats_qza)]
     _run(cmd)
 
 
@@ -112,11 +140,13 @@ def export(qza, output_folder):
     _run(cmd)
 
 
-def sample_summarize(metadata_file, table_qza, table_qzv):
+def sample_summarize(metadata_file, table_qza, table_qzv, feature_frequencies_qza, sample_frequencies_qza):
     cmd = ['qiime', 'feature-table', 'summarize',
-           '--m-sample-metadata-file', str(metadata_file),
+           '--m-metadata-file', str(metadata_file),
            '--i-table', str(table_qza),
-           '--o-visualization', str(table_qzv)]
+           '--o-summary', str(table_qzv),
+           '--o-feature-frequencies', str(feature_frequencies_qza),
+           '--o-sample-frequencies', str(sample_frequencies_qza)]
     _run(cmd)
 
 
@@ -159,7 +189,9 @@ def rarefaction(metadata_file, rooted_tree_qza, table_qza, rare_qzv, max_depth=4
     _run(cmd)
 
 
-def classify(classifier_qza, repseqs_qza, taxonomy_qza, n_jobs=-1):
+def classify(classifier_qza, repseqs_qza, taxonomy_qza, n_jobs=0):
+    """`n_jobs`: 0 uses all CPUs, 1 disables parallelism (q2-feature-classifier's
+    own convention -- unlike scikit-learn, it does not accept -1 for "all")."""
     cmd = ['qiime', 'feature-classifier', 'classify-sklearn',
            '--p-n-jobs', str(n_jobs),
            '--i-classifier', str(classifier_qza),

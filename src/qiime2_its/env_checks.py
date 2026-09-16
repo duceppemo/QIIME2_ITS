@@ -1,5 +1,6 @@
 """Sanity checks shared by all CLIs: CPU/parallelism clamping and conda env validation."""
 import os
+import shutil
 from multiprocessing import cpu_count
 
 
@@ -29,3 +30,17 @@ def check_qiime2_env_active(env_var='CONDA_DEFAULT_ENV'):
             'e.g. "conda activate rachis-qiime2-2026.7".'
         )
     return env_name
+
+
+def check_executable(name, hint=None):
+    """Raise a clear error if `name` isn't on PATH.
+
+    Without this, a missing external tool (e.g. bbduk.sh, only needed for
+    --min-len/--max-len and never installed by the QIIME2 environment itself)
+    fails late, deep inside a subprocess call, with a raw FileNotFoundError.
+    """
+    if shutil.which(name) is None:
+        message = f'Required external tool "{name}" not found on PATH.'
+        if hint:
+            message += f' {hint}'
+        raise EnvironmentError(message)

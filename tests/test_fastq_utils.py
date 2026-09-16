@@ -57,6 +57,25 @@ class TestValidateCasavaFilenames:
             fastq_utils.validate_casava_filenames([bad_name])
 
 
+class TestStripNonFastqFiles:
+    def test_removes_manifest_and_metadata_keeps_fastq(self, tmp_path):
+        """Regression test: `qiime tools export` writes MANIFEST/metadata.yml
+        alongside the fastq files, which broke re-importing exported reads
+        with CasavaOneEightSingleLanePerSampleDirFmt."""
+        fq = tmp_path / 'sample_bc_L001_R1_001.fastq.gz'
+        fq.write_text('x')
+        manifest = tmp_path / 'MANIFEST'
+        manifest.write_text('sample-id,filename,direction\n')
+        metadata_yml = tmp_path / 'metadata.yml'
+        metadata_yml.write_text('{}')
+
+        fastq_utils.strip_non_fastq_files(tmp_path, keep=[fq])
+
+        assert fq.exists()
+        assert not manifest.exists()
+        assert not metadata_yml.exists()
+
+
 class TestRemoveEmptiesSe:
     def test_drops_empty_records_keeps_good_ones(self, tmp_path, write_fastq):
         fq = tmp_path / 'sample_bc_L001_R1_001.fastq.gz'

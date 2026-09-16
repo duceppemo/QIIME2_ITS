@@ -53,6 +53,20 @@ def parse_fastq_list(fastq_list):
     return dict(sample_dict)
 
 
+def strip_non_fastq_files(directory, keep):
+    """Delete every file in `directory` that isn't in `keep`.
+
+    `qiime tools export` of a demultiplexed-reads artifact writes a MANIFEST
+    and metadata.yml alongside the fastq files; CasavaOneEightSingleLanePerSampleDirFmt
+    rejects re-importing a directory containing anything but Casava-named fastq
+    files, so these must be stripped before re-importing exported/post-processed reads.
+    """
+    keep = {Path(p) for p in keep}
+    for entry in Path(directory).iterdir():
+        if entry.is_file() and entry not in keep:
+            entry.unlink()
+
+
 def validate_casava_filenames(fastq_list):
     """Raise ValueError if any file doesn't follow the QIIME2 Casava naming scheme:
     ``<sample>_<barcode>_L<lane>_R[12]_001.fastq[.gz]``.

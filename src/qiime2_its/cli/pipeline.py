@@ -34,6 +34,23 @@ class Pipeline:
         self.taxa = args.taxa
         self.region = 'ITS1' if self.its1 else 'ITS2' if self.its2 else None
 
+        # DADA2 denoising. Defaults match qiime2's own (Illumina-tuned)
+        # defaults; single-end/IonTorrent users typically want a higher
+        # --max-ee (noisier reads) and --allow-one-off (homopolymer indels
+        # otherwise get miscalled as one-off bimeras).
+        self.max_ee = args.max_ee
+        self.max_ee_r = args.max_ee_r if args.max_ee_r is not None else args.max_ee
+        self.trunc_q = args.trunc_q
+        self.pooling_method = args.pooling_method
+        self.chimera_method = args.chimera_method
+        self.min_fold_parent_over_abundance = args.min_fold_parent_over_abundance
+        self.allow_one_off = args.allow_one_off
+        self.n_reads_learn = args.n_reads_learn
+
+        # Diversity analysis
+        self.sampling_depth = args.sampling_depth
+        self.max_rarefaction_depth = args.max_rarefaction_depth
+
         self.fastq_list = []
         self.sample_dict = {}
 
@@ -69,10 +86,21 @@ class Pipeline:
         repseq_qza = self.output_folder / 'rep-seqs.qza'
         table_qza = self.output_folder / 'table.qza'
         stats_qza = self.output_folder / 'stats.qza'
+        base_transition_stats_qza = self.output_folder / 'base-transition-stats.qza'
         if self.paired:
-            qiime_wrapper.dada2_denoise_paired(demux_qza, repseq_qza, table_qza, stats_qza)
+            qiime_wrapper.dada2_denoise_paired(
+                demux_qza, repseq_qza, table_qza, stats_qza, base_transition_stats_qza,
+                n_threads=self.cpu, max_ee_f=self.max_ee, max_ee_r=self.max_ee_r, trunc_q=self.trunc_q,
+                pooling_method=self.pooling_method, chimera_method=self.chimera_method,
+                min_fold_parent_over_abundance=self.min_fold_parent_over_abundance,
+                allow_one_off=self.allow_one_off, n_reads_learn=self.n_reads_learn)
         else:
-            qiime_wrapper.dada2_denoise_single(demux_qza, repseq_qza, table_qza, stats_qza)
+            qiime_wrapper.dada2_denoise_single(
+                demux_qza, repseq_qza, table_qza, stats_qza, base_transition_stats_qza,
+                n_threads=self.cpu, max_ee=self.max_ee, trunc_q=self.trunc_q,
+                pooling_method=self.pooling_method, chimera_method=self.chimera_method,
+                min_fold_parent_over_abundance=self.min_fold_parent_over_abundance,
+                allow_one_off=self.allow_one_off, n_reads_learn=self.n_reads_learn)
         qiime_wrapper.metadata_tabulate(stats_qza, self.output_folder / 'stats.qzv')
 
         print('Exporting BIOM table...')
@@ -80,7 +108,9 @@ class Pipeline:
         qiime_wrapper.export(table_qza, biom_folder)
 
         print('Summarizing feature table and representative sequences...')
-        qiime_wrapper.sample_summarize(self.metadata_file, table_qza, self.output_folder / 'table.qzv')
+        qiime_wrapper.sample_summarize(self.metadata_file, table_qza, self.output_folder / 'table.qzv',
+                                        self.output_folder / 'feature-frequencies.qza',
+                                        self.output_folder / 'sample-frequencies.qza')
         qiime_wrapper.seq_summary(repseq_qza, self.output_folder / 'rep-seqs.qzv')
 
         print('Aligning representative sequences and building phylogenetic tree...')
@@ -92,11 +122,13 @@ class Pipeline:
         qiime_wrapper.export(unrooted_qza, self.output_folder)
 
         print('Analyzing alpha and beta diversity...')
-        qiime_wrapper.core_diversity(self.cpu, self.metadata_file, rooted_qza, table_qza, self.output_folder)
+        qiime_wrapper.core_diversity(self.cpu, self.metadata_file, rooted_qza, table_qza, self.output_folder,
+                                      sampling_depth=self.sampling_depth)
 
         print('Creating rarefaction plot...')
         qiime_wrapper.rarefaction(self.metadata_file, rooted_qza, table_qza,
-                                   self.output_folder / 'alpha-rarefaction.qzv')
+                                   self.output_folder / 'alpha-rarefaction.qzv',
+                                   max_depth=self.max_rarefaction_depth)
 
         print('Assigning taxonomy to representative sequences...')
         taxonomy_qza = self.output_folder / 'taxonomy.qza'
@@ -154,6 +186,9 @@ class Pipeline:
         export_folder = self.output_folder / 'exported_reads'
         qiime_wrapper.export(current_qza, export_folder)
         exported_fastq = fastq_utils.list_fastq(export_folder)
+        # `qiime tools export` also writes MANIFEST/metadata.yml, which the
+        # Casava-only re-import format below rejects.
+        fastq_utils.strip_non_fastq_files(export_folder, exported_fastq)
 
         if self.its1 or self.its2:
             print('Checking for empty entries...')
@@ -197,6 +232,11 @@ class Pipeline:
         if (self.its1 or self.its2) and self.taxa not in TAXA_CODES:
             raise ValueError(f'--taxa must be one of: {", ".join(sorted(TAXA_CODES))}.')
 
+        if self.min_len > 0 or self.max_len > 0:
+            env_checks.check_executable(
+                'bbduk.sh', 'Install BBTools/BBMap into your QIIME2 environment, e.g. '
+                            '"conda install -c bioconda -c conda-forge bbmap".')
+
 
 def build_parser():
     parser = argparse.ArgumentParser(description='Run QIIME2 on ITS amplicon data using ITSxpress and DADA2')
@@ -236,6 +276,44 @@ def build_parser():
 
     parser.add_argument('--taxa', metavar='Fungi', default='Fungi', choices=sorted(TAXA_CODES),
                          help='Taxon of interest for ITSxpress. One of: ' + ', '.join(sorted(TAXA_CODES)))
+
+    dada2 = parser.add_argument_group(
+        'DADA2 denoising',
+        'QIIME2\'s DADA2 defaults are tuned for Illumina data. For noisier single-end platforms '
+        '(e.g. IonTorrent), consider raising --max-ee and passing --allow-one-off: their higher '
+        'per-base error rate means more real reads get discarded by the default max-expected-errors '
+        'threshold, and homopolymer-driven indels get miscalled as one-off bimeras by the default '
+        'chimera search.')
+    dada2.add_argument('--max-ee', metavar='2.0', type=float, default=2.0,
+                        help='Reads (forward reads, for paired-end) with more expected errors than this '
+                             'are discarded. Default is 2.0.')
+    dada2.add_argument('--max-ee-r', metavar='2.0', type=float, default=None,
+                        help='Max expected errors for the reverse read (paired-end only). Defaults to '
+                             '--max-ee.')
+    dada2.add_argument('--trunc-q', metavar='2', type=int, default=2,
+                        help='Truncate reads at the first quality score at or below this value. Default is 2.')
+    dada2.add_argument('--pooling-method', choices=['independent', 'pseudo'], default='independent',
+                        help='Sample pooling strategy for denoising. Default is independent.')
+    dada2.add_argument('--chimera-method', choices=['consensus', 'none'], default='consensus',
+                        help='Chimera removal method. Default is consensus.')
+    dada2.add_argument('--min-fold-parent-over-abundance', metavar='1.0', type=float, default=1.0,
+                        help='Minimum abundance fold-change a chimera\'s parent must have over the '
+                             'candidate chimera. Default is 1.0.')
+    dada2.add_argument('--allow-one-off', action='store_true',
+                        help='Also flag one-mismatch/indel-from-exact bimeras as chimeric. Off by default; '
+                             'consider enabling for homopolymer-heavy single-end data (e.g. IonTorrent).')
+    dada2.add_argument('--n-reads-learn', metavar='1000000', type=int, default=1000000,
+                        help='Minimum number of reads used to train the DADA2 error model. Default is '
+                             '1000000 (fewer reads speed up small runs at some cost to error-model quality).')
+
+    diversity = parser.add_argument_group('Diversity analysis')
+    diversity.add_argument('--sampling-depth', metavar='1000', type=int, default=1000,
+                            help='Rarefaction depth for core-metrics-phylogenetic. Samples with fewer '
+                                 'reads than this are excluded. Default is 1000 -- lower this for small/'
+                                 'pilot datasets.')
+    diversity.add_argument('--max-rarefaction-depth', metavar='4000', type=int, default=4000,
+                            help='Maximum depth for the alpha-rarefaction plot. Default is 4000.')
+
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     return parser
 
