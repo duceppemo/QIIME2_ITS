@@ -32,6 +32,30 @@ and logs to `validation/output/` (gitignored -- it's regenerated each run, not a
 The script exits non-zero on the first failure (`set -euo pipefail`), so a clean exit means all
 four scenarios completed without error.
 
+## `--with-unite` (heavy, opt-in)
+
+```bash
+validation/run_validation.sh --with-unite
+```
+
+Additionally downloads a real, current UNITE release via the `rescript` plugin
+(`qiime rescript get-unite-data`, bundled with QIIME2 -- see the main README's "From UNITE"
+section), repackages it into a real UNITE QIIME-release archive layout, and runs it through
+`qiime2-its-train-unite` and then `qiime2-its` itself, so the resulting classifier assigns real
+taxonomy to the bundled `single_end` reads.
+
+This is **not** part of the default run and nothing from it is bundled in the repo (unlike the
+~100KB of data used by the four scenarios above):
+- it downloads tens of MB from UNITE at runtime (UNITE data is CC BY-SA 4.0, see
+  https://unite.ut.ee/cite.php -- separate from the CC0/public-domain licensing of the data in
+  `data/`)
+- the naive-Bayes fit on the full release can take on the order of an **hour or more of CPU time**
+  and **several GB of RAM**
+
+Override `UNITE_VERSION`/`UNITE_TAXON_GROUP`/`UNITE_CLUSTER_ID` env vars to use a different release
+than the script's default (`2025-02-19`, `fungi`, `99`); see `qiime rescript get-unite-data --help`
+for the currently available versions.
+
 ## `results/`
 
 Dated, committed records of full validation runs -- the actual logs plus a `SUMMARY.md` noting the

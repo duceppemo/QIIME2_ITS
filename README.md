@@ -77,24 +77,41 @@ You need a QIIME2 classifier to run this pipeline. If you update your QIIME2 ver
 generally need to recompile the classifier.
 
 ### From UNITE
-QIIME files for UNITE are at https://unite.ut.ee/repository.php under "QIIME release". Replace the
-URL (`-u`), the database location (`-o`) and the QIIME2 env name (`-q`) to suit your installation.
-You can also pass an already-downloaded `.tgz` file as `-u`.
+
+**Preferred method**: the `rescript` plugin, included in the QIIME2 distribution, downloads UNITE
+directly from its PlutoF REST API -- no manual download needed, and it's the way UNITE itself now
+recommends fetching this data for QIIME2 (`https://unite.ut.ee/repository.php` now gates its files
+behind DOI landing pages with no stable direct-download URL, which is why the URL-based auto-
+download previously documented here generally no longer works):
 ```bash
 conda activate rachis-qiime2-2026.7
 
-# Using a URL
-qiime2-its-train-unite \
-    -u https://files.plutof.ut.ee/public/orig/C5/54/C5547B97AAA979E45F79DC4C8C4B12113389343D7588716B5AD330F8BDB300C9.tgz \
-    -o /db/UNITE \
-    -q rachis-qiime2-2026.7
+qiime rescript get-unite-data \
+    --p-version 2025-02-19 \
+    --p-taxon-group fungi \
+    --p-cluster-id 99 \
+    --p-no-singletons \
+    --o-sequences unite-sequences.qza \
+    --o-taxonomy unite-taxonomy.qza
 
-# Using an already-downloaded file
+qiime feature-classifier fit-classifier-naive-bayes \
+    --i-reference-reads unite-sequences.qza \
+    --i-reference-taxonomy unite-taxonomy.qza \
+    --o-classifier unite-classifier.qza
+```
+Run `qiime rescript get-unite-data --help` for the current list of available `--p-version` values.
+
+**Fallback**: if you already have a UNITE QIIME-release archive (`.tgz`) from another source (a
+manually downloaded copy, a colleague, an institutional mirror), `qiime2-its-train-unite` can
+extract, import, and train from it directly:
+```bash
 qiime2-its-train-unite \
-    -u ~/Downloads/C5547B97AAA979E45F79DC4C8C4B12113389343D7588716B5AD330F8BDB300C9.tgz \
+    -u ~/Downloads/sh_qiime_release_19.02.2025.tgz \
     -o /db/UNITE \
     -q rachis-qiime2-2026.7
 ```
+`-u` also accepts a URL, but only if it resolves directly to the archive file -- most current UNITE
+download links do not.
 
 ### From GenBank (NCBI query or accession list)
 `qiime2-its-train-ncbi` downloads sequences, downloads/parses taxonomy, and trains the classifier.
