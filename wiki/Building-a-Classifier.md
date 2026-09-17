@@ -124,9 +124,11 @@ first place.
 
 SILVA also publishes **ready-to-use, pretrained `.qza` classifiers** for common SSU/LSU
 regions/primer sets -- no training step at all, just download and point `--classifier` at it.
-Browse them at [arb-silva.de/current-release/QIIME2](https://www.arb-silva.de/current-release/QIIME2)
-(both "uniform" -- the standard classifiers -- and experimental habitat-weighted variants are
-offered per region); confirmed with a real download, e.g. the V3-V4 (341F/806R) 16S classifier:
+[arb-silva.de/current-release/QIIME2](https://www.arb-silva.de/current-release/QIIME2) is a real
+browsable directory tree (confirmed, not just a curated links page) laid out as
+`<QIIME2 version>/<SSU or LSU>/<region or primer set>/<uniform or weighted>/`, where "uniform" is
+the standard classifier and "weighted" is an experimental, habitat-adjusted variant. Confirmed
+with a real download, e.g. the V3-V4 (341F/806R) 16S classifier:
 ```
 https://www.arb-silva.de/fileadmin/silva_databases/current/QIIME2/2026.7/SSU/V3V4-341f-806r/uniform/SILVA_144_SSURef_NR99_uniform_classifier_V3V4-341f-806r.qza
 ```
