@@ -20,7 +20,13 @@
 ## Quick start
 
 ```bash
-# Inside an activated QIIME2 conda environment (see the wiki for full setup):
+# 1. Install QIIME2 (see the wiki for details/troubleshooting):
+VERSION=2026.7  # check https://library.qiime2.org/quickstart/qiime2 for the current release
+conda env create -n rachis-qiime2-$VERSION \
+    --file https://raw.githubusercontent.com/qiime2/distributions/dev/$VERSION/qiime2/released/rachis-qiime2-linux-64-conda.yml
+conda activate rachis-qiime2-$VERSION
+
+# 2. Install ITSxpress + BBMap into it, and this package:
 conda install -c bioconda -c conda-forge itsxpress bbmap
 qiime dev refresh-cache
 
@@ -28,8 +34,9 @@ git clone https://github.com/duceppemo/QIIME2_ITS
 cd QIIME2_ITS
 pip install -e .
 
+# 3. Run it:
 qiime2-its \
-    -q <your-qiime2-env> \
+    -q rachis-qiime2-$VERSION \
     -i /input_folder/ -o /output_folder/ \
     -m qiime2_metadata.tsv -c classifier.qza \
     -pe --extract-its2 --taxa Fungi
