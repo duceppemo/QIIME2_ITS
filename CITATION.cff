@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "QIIME2_ITS"
+abstract: >-
+  A QIIME2 pipeline for single-end (IonTorrent) and paired-end (Illumina) ITS
+  metabarcoding data: ITSxpress for ITS region extraction, DADA2 for
+  denoising, plus diversity statistics, sample classification, and a PDF
+  summary report.
+authors:
+  - family-names: "Duceppe"
+    given-names: "Marc-Olivier"
+    alias: "duceppemo"
+    email: "17859096+duceppemo@users.noreply.github.com"
+repository-code: "https://github.com/duceppemo/QIIME2_ITS"
+url: "https://github.com/duceppemo/QIIME2_ITS"
+license: MIT
+version: 0.2.1
+date-released: "2026-09-16"
+keywords:
+  - bioinformatics
+  - QIIME2
+  - ITS
+  - metabarcoding
+  - amplicon sequencing
+  - DADA2
