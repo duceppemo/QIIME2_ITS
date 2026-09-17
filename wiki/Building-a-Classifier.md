@@ -113,15 +113,27 @@ qiime2-its-train-fasta \
 ## Other databases (not for ITS)
 
 `rescript` and the wider QIIME2 ecosystem also integrate several other reference databases:
-[SILVA](https://www.arb-silva.de/) (`qiime rescript get-silva-data`, and SILVA also publishes
-[ready-to-use, pretrained `.qza` classifiers](https://www.arb-silva.de/documentation/classifiers/qiime-2)
-so you don't even need to train one yourself), GTDB (`get-gtdb-data`), PR2 (`get-pr2-data`), and a
-few others. **None of these cover the ITS region** -- confirmed against each action's real
-`--help` output: SILVA's `--p-target` only offers `SSURef`/`LSURef` (16S/18S and 23S/28S rRNA),
-GTDB is bacterial/archaeal SSU only, PR2 is protist SSU only. This isn't a QIIME2 limitation to
-work around -- the ITS region is the *non-conserved* spacer between rRNA genes, which is exactly
-why these curated rRNA databases exclude it, and why UNITE/Eukaryome (both amplicon-database
-projects, not rRNA-alignment projects) exist as separate resources for it in the first place.
+[SILVA](https://www.arb-silva.de/) (`qiime rescript get-silva-data`), GTDB (`get-gtdb-data`), PR2
+(`get-pr2-data`), and a few others. **None of these cover the ITS region** -- confirmed against
+each action's real `--help` output: SILVA's `--p-target` only offers `SSURef`/`LSURef` (16S/18S
+and 23S/28S rRNA), GTDB is bacterial/archaeal SSU only, PR2 is protist SSU only. This isn't a
+QIIME2 limitation to work around -- the ITS region is the *non-conserved* spacer between rRNA
+genes, which is exactly why these curated rRNA databases exclude it, and why UNITE/Eukaryome (both
+amplicon-database projects, not rRNA-alignment projects) exist as separate resources for it in the
+first place.
+
+SILVA also publishes **ready-to-use, pretrained `.qza` classifiers** for common SSU/LSU
+regions/primer sets -- no training step at all, just download and point `--classifier` at it.
+Browse them at [arb-silva.de/current-release/QIIME2](https://www.arb-silva.de/current-release/QIIME2)
+(both "uniform" -- the standard classifiers -- and experimental habitat-weighted variants are
+offered per region); confirmed with a real download, e.g. the V3-V4 (341F/806R) 16S classifier:
+```
+https://www.arb-silva.de/fileadmin/silva_databases/current/QIIME2/2026.7/SSU/V3V4-341f-806r/uniform/SILVA_144_SSURef_NR99_uniform_classifier_V3V4-341f-806r.qza
+```
+(112 MB, 200 OK). The path encodes the QIIME2 version it was built for (`2026.7` here) -- match it
+to your own installed QIIME2 version, since a classifier's scikit-learn version has to match the
+one your QIIME2 environment ships (`classify-sklearn` will warn, and may give unreliable results,
+across a scikit-learn version mismatch).
 
 That said, **this pipeline isn't hardcoded to ITS**: `--extract-its1`/`--extract-its2` are
 optional (they just run ITSxpress before DADA2). Omit both and supply a matching classifier --
