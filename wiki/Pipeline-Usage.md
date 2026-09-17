@@ -33,7 +33,7 @@ usage: qiime2-its [-h] -q rachis-qiime2-2026.7 -i /input_folder/ -o
 | `-rc`, `--reverse_complement` | Reads are in reverse complement (e.g. sequenced 5.8S to 18S). |
 | `--min-len` / `--max-len` | Read-length filtering (needs `bbduk.sh` — see [Installation](Installation)). Default 0 (off). |
 | `-se` / `-pe` | Single-end or paired-end. Exactly one required. |
-| `--extract-its1` / `--extract-its2` | Extract ITS1 or ITS2 with ITSxpress. At most one. |
+| `--extract-its1` / `--extract-its2` | Extract ITS1 or ITS2 with ITSxpress. At most one. Both optional — omit both to run the pipeline on a non-ITS marker (16S/18S/etc.) with a matching classifier, see [Building a classifier](Building-a-Classifier#other-databases-not-for-its). |
 | `--taxa` | Taxon for ITSxpress. Default `Fungi`. Full list: `qiime itsxpress trim-single --help`. |
 
 ## DADA2 denoising
