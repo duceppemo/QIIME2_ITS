@@ -144,6 +144,35 @@ class TestSplitBetaStem:
         assert column == 'site-some_new_metric'
 
 
+class TestSignificantColumns:
+    def test_column_with_any_significant_metric_is_included(self):
+        pvalues_by_column = {'site': [0.6, 0.01], 'host-plant': [0.5, 0.8]}
+        assert report._significant_columns(pvalues_by_column) == ['site']
+
+    def test_none_pvalues_are_ignored_not_treated_as_significant(self):
+        """A test that couldn't be computed for some column/metric (None)
+        must not be mistaken for a significant (low) p-value."""
+        assert report._significant_columns({'site': [None, None]}) == []
+
+    def test_no_significant_columns_returns_empty_list(self):
+        assert report._significant_columns({'site': [0.6], 'host-plant': [0.8]}) == []
+
+    def test_result_is_sorted(self):
+        pvalues_by_column = {'zzz-column': [0.01], 'aaa-column': [0.02]}
+        assert report._significant_columns(pvalues_by_column) == ['aaa-column', 'zzz-column']
+
+
+class TestSignificanceNote:
+    def test_significant_column_gets_the_significance_reason(self):
+        note = report._significance_note('site', ['site'])
+        assert 'significant' in note
+        assert 'site' in note
+
+    def test_non_significant_default_column_gets_the_default_reason(self):
+        note = report._significance_note('site', [])
+        assert 'default' in note
+
+
 class TestFitCellText:
     def test_short_text_passes_through_unchanged(self):
         pdf = report._ReportPDF()
@@ -488,6 +517,34 @@ class TestBuildReport:
 
         assert report_path.exists()
         assert 'not-a-real-column' in capsys.readouterr().out
+
+    def test_significant_non_default_column_adds_its_own_pages(self, tmp_path):
+        """A metadata column other than the default/auto-picked one, but
+        that comes back statistically significant, should get its own
+        PCoA/dendrogram pages too -- not just the default column's."""
+        output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
+        baseline_path = report.build_report(output_folder, metadata_path)
+        baseline_size = baseline_path.stat().st_size
+
+        # Add a second metadata column with a genuinely significant result,
+        # distinct from 'site' (the auto-picked default for this fixture).
+        metadata_path.write_text(
+            'sample-id\tsite\ttreatment\n#q2:types\tcategorical\tcategorical\n'
+            'sampleA\tsiteA\ttreatA\nsampleB\tsiteA\ttreatA\n'
+            'sampleC\tsiteB\ttreatB\nsampleD\tsiteB\ttreatB\n'
+        )
+        _write_beta_qzv(output_folder / 'beta-group-significance-treatment-bray_curtis.qzv', {
+            'method name': 'PERMANOVA', 'test statistic name': 'pseudo-F',
+            'sample size': '4', 'number of groups': '2', 'test statistic': '9.0', 'p-value': '0.01',
+        })
+
+        report_path = report.build_report(output_folder, metadata_path)
+
+        assert report_path.exists()
+        # A rough but real proxy for "extra pages were actually added": the
+        # significant-column run has strictly more PCoA/dendrogram content
+        # than the baseline run of the same otherwise-identical fixture.
+        assert report_path.stat().st_size > baseline_size
 
     def test_works_with_missing_optional_artifacts(self, tmp_path):
         """A --skip-advanced-stats run won't have any of the group-

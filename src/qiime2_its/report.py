@@ -265,6 +265,29 @@ def _split_beta_stem(stem):
     return stem, ''
 
 
+_SIGNIFICANCE_THRESHOLD = 0.05
+
+
+def _significant_columns(pvalues_by_column):
+    """Columns with at least one p-value below _SIGNIFICANCE_THRESHOLD.
+    `pvalues_by_column` is {column: [p_value, ...]}; entries may be None
+    (a test that couldn't be computed for that column/metric)."""
+    return sorted(column for column, pvalues in pvalues_by_column.items()
+                  if any(p is not None and p < _SIGNIFICANCE_THRESHOLD for p in pvalues))
+
+
+def _significance_note(column, significant_columns):
+    """One extra sentence on why this particular column's figure appears --
+    once more than one column can drive a figure, an undifferentiated run of
+    same-shaped pages reads as a dump rather than a report; this makes each
+    page's reason for being there explicit."""
+    if column in significant_columns:
+        return (f' Shown here because {column} came back statistically significant '
+                f'(p < {_SIGNIFICANCE_THRESHOLD}) above.')
+    return (f' Shown here as the report\'s default grouping column, though it did not reach '
+            f'statistical significance for this comparison.')
+
+
 # Already shown as their own rows on the "Run information" page -- excluded
 # from "Pipeline parameters" so the two pages don't just repeat each other.
 _PARAMETERS_SHOWN_ELSEWHERE = {'input', 'output', 'metadata', 'classifier', 'qiime2'}
@@ -285,8 +308,8 @@ _INTRO_ALPHA_TABLE = (
     '(conventionally < 0.05) indicates the groups differ.'
 )
 _INTRO_ALPHA_BOXPLOT = (
-    'Boxplots of each alpha diversity metric, split by the report\'s grouping column -- the same '
-    'comparison as the group-significance table, shown visually.'
+    'Boxplots of each alpha diversity metric, split by this metadata column -- the same comparison '
+    'as the group-significance table above, shown visually.'
 )
 _INTRO_BETA_TABLE = (
     'Beta diversity compares community composition (not just richness) between samples. PERMANOVA '
@@ -678,7 +701,10 @@ def build_report(output_folder, metadata_file, report_column=None):
     pdf.set_auto_page_break(auto=True, margin=15)
 
     # 1. Title / summary
-    summary_lines = [f'Samples: {len(final_sample_ids)}', f'Report grouping column: {report_column or "(none eligible)"}']
+    summary_lines = [f'Samples: {len(final_sample_ids)}',
+                      f'Default report grouping column: {report_column or "(none eligible)"}',
+                      '(alpha/beta diversity figures below also cover any other column with a '
+                      'statistically significant result)']
     dada2 = _dada2_summary_table(output_folder)
     if dada2 is not None:
         df, _header, _rows = dada2
@@ -722,54 +748,76 @@ def build_report(output_folder, metadata_file, report_column=None):
 
     if alpha_results:
         rows = []
+        alpha_pvalues_by_column = {}
         for metric, by_column in alpha_results.items():
             for column, stats in by_column.items():
                 rows.append([metric, column, f'{stats["h_statistic"]:.3f}', f'{stats["p_value"]:.3f}'])
+                alpha_pvalues_by_column.setdefault(column, []).append(stats.get('p_value'))
         pdf.add_table_page('Alpha diversity group significance (Kruskal-Wallis)',
                             ['metric', 'metadata column', 'H', 'p-value'], rows, intro=_INTRO_ALPHA_TABLE)
 
-        if report_column and any(report_column in by_column for by_column in alpha_results.values()):
-            alpha_fig = _alpha_boxplot_figure(alpha_results, report_column)
-            pdf.add_figure_page('Alpha diversity by group', alpha_fig, width=_fit_width_mm(alpha_fig),
-                                 intro=_INTRO_ALPHA_BOXPLOT)
+        # One boxplot page per metadata column that's either the report's
+        # default grouping column or came back significant above -- not
+        # every eligible column, which would bury the columns that actually
+        # show something behind however many don't.
+        alpha_significant = _significant_columns(alpha_pvalues_by_column)
+        alpha_columns = sorted(set(alpha_significant) | ({report_column} if report_column else set()))
+        for column in alpha_columns:
+            if any(column in by_column for by_column in alpha_results.values()):
+                alpha_fig = _alpha_boxplot_figure(alpha_results, column)
+                intro = _INTRO_ALPHA_BOXPLOT + _significance_note(column, alpha_significant)
+                pdf.add_figure_page(f'Alpha diversity by {column}', alpha_fig, width=_fit_width_mm(alpha_fig),
+                                     intro=intro)
 
     # 4. Beta diversity: PCoA + PERMANOVA
     beta_rows = []
+    beta_pvalues_by_column = {}
     for qzv_path in sorted(output_folder.glob('beta-group-significance-*.qzv')):
         stats = report_data.parse_beta_group_significance(qzv_path)
         column, metric = _split_beta_stem(qzv_path.stem)
         beta_rows.append([column, metric, stats.get('test_statistic_name'),
                            f'{stats["test_statistic"]:.3f}' if stats.get('test_statistic') is not None else '',
                            f'{stats["p_value"]:.3f}' if stats.get('p_value') is not None else ''])
+        beta_pvalues_by_column.setdefault(column, []).append(stats.get('p_value'))
     if beta_rows:
         pdf.add_table_page('Beta diversity group significance (PERMANOVA)',
                             ['metadata column', 'distance metric', 'statistic', 'value', 'p-value'], beta_rows,
                             intro=_INTRO_BETA_TABLE)
 
-    if report_column:
-        # Computed once so the same group gets the same color on both the
-        # PCoA and dendrogram pages, for both distance metrics, rather than
-        # each figure picking its own colors from whatever subset of
-        # samples/groups it happens to see.
-        group_color = _group_color_map(metadata_table, report_column)
+    # One sub-section per metadata column that's either the report's default
+    # grouping column or came back significant above (same selection as the
+    # alpha boxplots) -- grouped by column rather than interleaving columns
+    # and metrics, so everything about one metadata factor (both metrics,
+    # both PCoA and dendrogram) reads together instead of scattering related
+    # pages apart.
+    beta_significant = _significant_columns(beta_pvalues_by_column)
+    beta_columns = sorted(set(beta_significant) | ({report_column} if report_column else set()))
+    for column in beta_columns:
+        # Computed once per column so the same group gets the same color on
+        # both the PCoA and dendrogram pages, for both distance metrics,
+        # rather than each figure picking its own colors from whatever
+        # subset of samples/groups it happens to see.
+        group_color = _group_color_map(metadata_table, column)
+        note = _significance_note(column, beta_significant)
         for metric in ('bray_curtis', 'unweighted_unifrac'):
             metric_display = _METRIC_DISPLAY_NAMES.get(metric, metric)
             ordination_path = output_folder / 'core-metrics-results' / f'{metric}_pcoa_export' / 'ordination.txt'
             if ordination_path.exists():
                 sample_coords, proportion_explained = report_data.parse_ordination(ordination_path)
-                pdf.add_figure_page(f'{metric_display} PCoA', _pcoa_figure(
-                    sample_coords, proportion_explained, metadata_table, report_column,
-                    f'{metric_display} (colored by {report_column})', group_color=group_color), intro=_INTRO_PCOA)
+                pdf.add_figure_page(f'{column}: {metric_display} PCoA', _pcoa_figure(
+                    sample_coords, proportion_explained, metadata_table, column,
+                    f'{metric_display} (colored by {column})', group_color=group_color),
+                    intro=_INTRO_PCOA + note)
 
             distance_path = output_folder / 'core-metrics-results' / f'{metric}_distance_export' / \
                 'distance-matrix.tsv'
             if distance_path.exists():
                 distance_df = report_data.parse_distance_matrix(distance_path)
-                dendrogram_fig = _dendrogram_figure(distance_df, metadata_table, report_column,
-                                                     f'{metric_display} (UPGMA, colored by {report_column})',
+                dendrogram_fig = _dendrogram_figure(distance_df, metadata_table, column,
+                                                     f'{metric_display} (UPGMA, colored by {column})',
                                                      group_color=group_color)
-                pdf.add_figure_page(f'{metric_display} sample clustering', dendrogram_fig,
-                                     width=_fit_width_mm(dendrogram_fig), intro=_INTRO_DENDROGRAM)
+                pdf.add_figure_page(f'{column}: {metric_display} sample clustering', dendrogram_fig,
+                                     width=_fit_width_mm(dendrogram_fig), intro=_INTRO_DENDROGRAM + note)
 
     # 5. Genus-level composition
     biom_taxo_path = output_folder / 'biom_table' / 'table-with-taxonomy.biom.tsv'
