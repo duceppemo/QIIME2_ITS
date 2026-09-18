@@ -35,14 +35,18 @@ _COLORBLIND_PALETTE = [
     '#F0E442',  # yellow
     '#000000',  # black
 ]
-# Fixed, non-cycled color for a chart's "Other"/"Unclassified" catch-all
-# category, so it never coincides with a real category's color and reads
-# consistently as "not a specific answer" the way grey conventionally does.
-# Deliberately darker than a typical "muted" grey (#999999): checked against
-# a real rendered report, that lighter grey read as visually indistinguishable
-# from the page's white background, making a real (and often large, for
-# "Unclassified") segment look like a gap in the bar instead.
-_NEUTRAL_GREY = '#666666'
+# Fixed, non-cycled colors for a chart's "Other"/"Unclassified" catch-all
+# categories, so neither ever coincides with a real category's color and both
+# read consistently as "not a specific answer" the way grey conventionally
+# does. Two different shades (rather than one grey for both) keep the two
+# catch-alls -- which mean different things and can each be a large segment
+# -- visually distinguishable from each other. Deliberately darker than a
+# typical "muted" grey (#999999): checked against a real rendered report,
+# that lighter grey read as visually indistinguishable from the page's white
+# background, making a real (and often large, for "Unclassified") segment
+# look like a gap in the bar instead.
+_NEUTRAL_GREY_UNCLASSIFIED = '#4D4D4D'
+_NEUTRAL_GREY_OTHER = '#A6A6A6'
 
 plt.rcParams.update({
     'axes.prop_cycle': plt.cycler(color=_COLORBLIND_PALETTE),
@@ -194,7 +198,7 @@ class _ReportPDF(FPDF):
         self.line(x_start, self.get_y(), x_start + table_width, self.get_y())
         self.ln(3)
 
-    def add_keyvalue_page(self, title, rows, label_width=45, intro=None):
+    def add_keyvalue_page(self, title, rows, label_width=None, intro=None):
         """A label/value list, one entry per line -- for QA/provenance
         fields whose values vary too much in length for add_table_page's
         fixed-width, truncate-if-too-long cells (a full file path or command
@@ -203,6 +207,13 @@ class _ReportPDF(FPDF):
         self.section_title(title)
         if intro:
             self.add_intro_text(intro)
+        self.set_font('Helvetica', 'B', 10)
+        if label_width is None:
+            # cell() doesn't wrap or clip -- a label wider than a fixed
+            # label_width would bleed into the value column instead of
+            # being cut off, so size the column to the widest label
+            # actually present rather than guessing a fixed value.
+            label_width = max((self.get_string_width(f'{label}:') for label, _ in rows), default=0) + 3
         for label, value in rows:
             value = str(value)
             self.set_font('Helvetica', 'B', 10)
@@ -405,7 +416,10 @@ def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_col
     ax.set_xlabel(f'PC1 ({proportion_explained[0] * 100:.1f}%)')
     ax.set_ylabel(f'PC2 ({proportion_explained[1] * 100:.1f}%)')
     ax.set_title(title)
-    ax.legend(fontsize=9, frameon=True)
+    # Placed outside the axes (rather than loc='best' inside it) so the
+    # legend never sits on top of a data point, whatever the point cloud's
+    # shape happens to be for a given run's data.
+    ax.legend(fontsize=9, frameon=True, bbox_to_anchor=(1.02, 1), loc='upper left')
     fig.tight_layout()
     return fig
 
@@ -426,13 +440,16 @@ def _fit_width_mm(fig, max_height_mm=230, max_width_mm=180):
 
 def _genus_colors(index):
     """One color per genus, cycling the colorblind palette -- except 'Other'
-    and 'Unclassified', which always get the same fixed neutral grey rather
-    than whatever color they'd land on next in the cycle."""
+    and 'Unclassified', which always get their own fixed neutral greys
+    (different from each other) rather than whatever color they'd land on
+    next in the cycle."""
     colors = []
     next_color = 0
     for label in index:
-        if label in ('Other', 'Unclassified'):
-            colors.append(_NEUTRAL_GREY)
+        if label == 'Unclassified':
+            colors.append(_NEUTRAL_GREY_UNCLASSIFIED)
+        elif label == 'Other':
+            colors.append(_NEUTRAL_GREY_OTHER)
         else:
             colors.append(_COLORBLIND_PALETTE[next_color % len(_COLORBLIND_PALETTE)])
             next_color += 1
@@ -449,15 +466,15 @@ def _genus_barplot_figure(genus_table):
         fig, ax = plt.subplots(figsize=(8, min(24, max(6, 0.3 * n_samples))))
         genus_table.T.plot(kind='barh', stacked=True, ax=ax, legend=True, width=0.85, color=colors,
                            edgecolor='white', linewidth=0.4)
-        ax.set_xlabel('Relative abundance')
+        ax.set_xlabel('Relative abundance', fontsize=12)
         ax.invert_yaxis()  # first sample at the top, matching reading order
     else:
         fig, ax = plt.subplots(figsize=(max(6, 0.6 * n_samples), 5))
         genus_table.T.plot(kind='bar', stacked=True, ax=ax, legend=True, width=0.85, color=colors,
                            edgecolor='white', linewidth=0.4)
-        ax.set_ylabel('Relative abundance')
-    ax.tick_params(axis='both', labelsize=10)
-    ax.legend(fontsize=10, bbox_to_anchor=(1.02, 1), loc='upper left', frameon=True)
+        ax.set_ylabel('Relative abundance', fontsize=12)
+    ax.tick_params(axis='both', labelsize=11)
+    ax.legend(fontsize=12, bbox_to_anchor=(1.02, 1), loc='upper left', frameon=True)
     fig.tight_layout()
     return fig
 

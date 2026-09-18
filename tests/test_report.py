@@ -206,16 +206,18 @@ class TestFitWidthMm:
 
 
 class TestGenusColors:
-    def test_other_and_unclassified_always_get_the_fixed_neutral_grey(self):
+    def test_unclassified_and_other_get_distinct_fixed_neutral_greys(self):
         colors = report._genus_colors(['Unclassified', 'Fusarium', 'Penicillium', 'Other'])
-        assert colors[0] == report._NEUTRAL_GREY
-        assert colors[3] == report._NEUTRAL_GREY
+        assert colors[0] == report._NEUTRAL_GREY_UNCLASSIFIED
+        assert colors[3] == report._NEUTRAL_GREY_OTHER
+        assert colors[0] != colors[3]  # must not look the same as each other
 
     def test_named_genera_cycle_the_colorblind_palette_without_using_grey(self):
         colors = report._genus_colors(['Unclassified', 'Fusarium', 'Penicillium', 'Other'])
         assert colors[1] == report._COLORBLIND_PALETTE[0]
         assert colors[2] == report._COLORBLIND_PALETTE[1]
-        assert report._NEUTRAL_GREY not in (colors[1], colors[2])
+        assert colors[1] not in (report._NEUTRAL_GREY_UNCLASSIFIED, report._NEUTRAL_GREY_OTHER)
+        assert colors[2] not in (report._NEUTRAL_GREY_UNCLASSIFIED, report._NEUTRAL_GREY_OTHER)
 
 
 class TestGenusBarplotFigure:
