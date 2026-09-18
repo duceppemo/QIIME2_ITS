@@ -314,10 +314,15 @@ def parse_distance_matrix(distance_matrix_tsv_path):
 def parse_run_metadata(run_metadata_json_path):
     """Parse run_metadata.json (written by cli/pipeline.py via
     provenance.write_run_metadata()) into a plain dict, or None if it
-    doesn't exist -- e.g. an output folder from before this existed, or one
-    the pipeline never finished writing to."""
+    doesn't exist -- e.g. an output folder from before this existed -- or
+    can't be parsed as JSON -- e.g. a leftover truncated file from an older
+    run that predates write_run_metadata()'s atomic write, or a process
+    killed while the file itself was being read. Either way this is one of
+    several optional QA/provenance pages; build_report() degrades to
+    skipping them rather than the whole report crashing over one missing or
+    unreadable file."""
     try:
         with open(run_metadata_json_path) as fh:
             return json.load(fh)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         return None

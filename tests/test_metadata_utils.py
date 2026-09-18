@@ -67,6 +67,26 @@ class TestClassSizes:
         assert counts == {'siteA': 1}
 
 
+class TestFinalSampleIds:
+    def test_filters_out_zero_read_samples(self):
+        sample_frequencies = {'sampleA': 19.0, 'sampleB': 0.0, 'sampleC': 7.0}
+        assert metadata_utils.final_sample_ids(sample_frequencies, ['sampleA', 'sampleB', 'sampleC']) \
+            == ['sampleA', 'sampleC']
+
+    def test_falls_back_to_every_sample_when_frequencies_missing(self):
+        assert metadata_utils.final_sample_ids({}, ['sampleA', 'sampleB']) == ['sampleA', 'sampleB']
+
+    def test_all_zero_read_samples_returns_empty_not_the_fallback(self):
+        """Regression test: a naive `filtered or fallback_sample_ids`
+        implementation can't distinguish "frequencies were never loaded"
+        from "every sample loaded at zero reads" -- both produce an empty
+        filtered list, but only the first should fall back to every sample.
+        A run where literally every sample ended up zero-read must report
+        zero eligible samples, not silently un-exclude them all."""
+        sample_frequencies = {'sampleA': 0.0, 'sampleB': 0.0}
+        assert metadata_utils.final_sample_ids(sample_frequencies, ['sampleA', 'sampleB']) == []
+
+
 class TestEligibleCategoricalColumns:
     def test_excludes_numeric_columns(self, metadata_with_types):
         eligible = metadata_utils.eligible_categorical_columns(

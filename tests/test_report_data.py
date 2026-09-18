@@ -115,6 +115,23 @@ class TestParseAlphaGroupSignificance:
         result = report_data.parse_alpha_group_significance(qzv)
         assert result['site']['groups'] == {'siteA': [0.97, 1.52], 'siteB': [0.97]}
 
+    def test_no_group_data_object_falls_back_to_empty_groups(self, tmp_path):
+        """Regression-shaped coverage for the group_data_start == -1 branch:
+        a jsonp with no '{' at all after the column-name argument (a
+        malformed/legacy layout) must not crash _extract_json_object -- it
+        should fall back to empty groups while still surfacing the H/p
+        stats the regex already matched independently."""
+        qzv = tmp_path / 'alpha.qzv'
+        content = 'load_data({"H": 0.9, "p": 0.6},no_brace_here)'
+        with zipfile.ZipFile(qzv, 'w') as zf:
+            zf.writestr('uuid1234/data/column-site.jsonp', content)
+
+        result = report_data.parse_alpha_group_significance(qzv)
+
+        assert result['site']['h_statistic'] == 0.9
+        assert result['site']['p_value'] == 0.6
+        assert result['site']['groups'] == {}
+
 
 def _write_beta_group_significance_qzv(path, overview_rows):
     html = '<html><body><table>' + ''.join(
@@ -145,6 +162,23 @@ class TestParseBetaGroupSignificance:
             'test_statistic': 2.345,
             'p_value': 0.012,
         }
+
+    def test_missing_field_becomes_none_instead_of_crashing(self, tmp_path):
+        """No test previously exercised _num()'s None-fallback branch (every
+        fixture supplied every field) -- a qzv whose Overview table is
+        missing a numeric field entirely must not raise trying to cast
+        None."""
+        qzv = tmp_path / 'beta.qzv'
+        _write_beta_group_significance_qzv(qzv, {
+            'method name': 'PERMANOVA',
+            'test statistic name': 'pseudo-F',
+            'sample size': '6',
+            'number of groups': '3',
+            'test statistic': '2.345',
+            # 'p-value' deliberately omitted
+        })
+        result = report_data.parse_beta_group_significance(qzv)
+        assert result['p_value'] is None
 
 
 def _write_rarefaction_qzv(path, metric, rows):
@@ -257,6 +291,17 @@ class TestParseRunMetadata:
 
     def test_returns_none_when_missing(self, tmp_path):
         assert report_data.parse_run_metadata(tmp_path / 'does-not-exist.json') is None
+
+    def test_returns_none_when_json_is_corrupt(self, tmp_path):
+        """Regression test: a pipeline run killed mid-write (or, before
+        provenance.write_run_metadata()'s atomic write, any interrupted run)
+        can leave a truncated, unparseable run_metadata.json on disk. Every
+        other optional artifact in build_report() degrades gracefully via an
+        .exists() guard; a corrupt-but-present file bypasses that guard
+        entirely, so this needs its own handling."""
+        path = tmp_path / 'run_metadata.json'
+        path.write_text('{"pipeline": {"qiime2_its_versio')  # truncated mid-write
+        assert report_data.parse_run_metadata(path) is None
 
 
 class TestParseFastaSequenceLengths:

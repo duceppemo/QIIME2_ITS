@@ -600,6 +600,30 @@ class TestBuildReport:
         assert report_path.exists()
         assert 'not-a-real-column' in capsys.readouterr().out
 
+    def test_ineligible_report_column_falls_back_with_a_warning(self, tmp_path, capsys):
+        """Regression test: a real column that exists in the metadata file
+        but isn't eligible for grouping (here, numeric rather than
+        categorical) used to pass the old "does this column exist at all"
+        check and reach the PCoA/dendrogram loop -- which only checks that
+        the per-metric ordination/distance artifacts exist, not that any
+        significance test was ever run for this particular column -- so the
+        figures got built and captioned as "did not reach statistical
+        significance" even though no such test exists for a numeric column.
+        Must fall back to auto-selection instead, same as a nonexistent
+        column."""
+        output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
+        metadata_path.write_text(
+            'sample-id\tsite\televation\n#q2:types\tcategorical\tnumeric\n'
+            'sampleA\tsiteA\t100\nsampleB\tsiteA\t150\nsampleC\tsiteB\t200\nsampleD\tsiteB\t250\n'
+        )
+
+        report_path = report.build_report(output_folder, metadata_path, report_column='elevation')
+
+        assert report_path.exists()
+        out = capsys.readouterr().out
+        assert 'elevation' in out
+        assert 'eligible' in out
+
     def test_significant_non_default_column_adds_its_own_pages(self, tmp_path):
         """A metadata column other than the default/auto-picked one, but
         that comes back statistically significant, should get its own

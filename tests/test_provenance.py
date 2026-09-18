@@ -167,3 +167,15 @@ class TestBuildRunMetadata:
         path = tmp_path / 'run_metadata.json'
         provenance.write_run_metadata(path, result)
         assert json.loads(path.read_text()) == result
+
+    def test_writes_atomically_leaving_no_leftover_temp_file(self, tmp_path):
+        """Regression test: a plain write_text() used to leave a truncated,
+        unparseable run_metadata.json on disk if the process was killed or
+        the disk filled up mid-write -- report_data.parse_run_metadata()
+        would then hit a corrupt file it couldn't distinguish from "never
+        finished writing". Written via a temp file + rename instead, so the
+        target path is always either the previous complete file or the new
+        one, never a partial write."""
+        path = tmp_path / 'run_metadata.json'
+        provenance.write_run_metadata(path, self._build())
+        assert list(tmp_path.iterdir()) == [path]  # no leftover .tmp sibling

@@ -582,7 +582,12 @@ def _dendrogram_figure(distance_df, metadata_table, report_column, title, group_
         # yellow, are too pale to read as small text even though they're
         # fine as a dot/bar/line fill) -- the underlying group_color mapping
         # itself stays untouched so it matches the PCoA page's dot colors.
-        text_color = {group: _readable_text_color(group_color.get(group, '#000000')) for group in groups}
+        # Same '#666666' fallback _pcoa_figure uses for a group missing from
+        # group_color (a sample in the distance matrix but not metadata_table)
+        # -- group_color_map's own docstring promises the same group gets the
+        # same color on every figure; two different hardcoded fallback colors
+        # here and there would quietly break that for this edge case.
+        text_color = {group: _readable_text_color(group_color.get(group, '#666666')) for group in groups}
         tick_labels = ax.get_yticklabels() if orientation == 'left' else ax.get_xticklabels()
         for tick_label in tick_labels:
             group = metadata_table.get(tick_label.get_text(), {}).get(report_column, '?')
@@ -736,22 +741,31 @@ def build_report(output_folder, metadata_file, report_column=None):
     sample_freq_path = output_folder / 'sample_frequencies' / 'metadata.tsv'
     sample_frequencies = (report_data.parse_sample_frequencies(sample_freq_path)
                            if sample_freq_path.exists() else {})
-    final_sample_ids = [sid for sid, freq in sample_frequencies.items() if freq > 0] \
-        or list(metadata_table)
+    final_sample_ids = metadata_utils.final_sample_ids(sample_frequencies, metadata_table)
 
-    if report_column is not None and report_column not in metadata_utils.parse_metadata_columns(metadata_file):
+    # Same eligibility rule cli/pipeline.py uses to decide which columns
+    # beta-group-significance/alpha-group-significance actually get run
+    # against -- computed once, used both to validate an explicit
+    # report_column and to auto-pick one below.
+    eligible_columns = metadata_utils.eligible_categorical_columns(metadata_file, final_sample_ids)
+
+    if report_column is not None and report_column not in eligible_columns:
         # A typo'd/nonexistent --report-metadata-column used to fail
-        # silently: every group-by-report_column lookup downstream just
-        # returns nothing for a column that doesn't exist, producing a
-        # degraded report (blank groups, single "?" group in plots) with no
-        # indication anything was wrong.
-        print(f'Warning: --report-metadata-column "{report_column}" is not a column in {metadata_file} -- '
-              f'falling back to auto-selecting an eligible column instead.')
+        # silently (every group-by-report_column lookup downstream just
+        # returns nothing for a column that doesn't exist). A real but
+        # ineligible column (numeric, or too few/too-small groups) was
+        # worse: PCoA/dendrogram figures were still built for it -- the
+        # metric-level artifacts they read exist independent of any
+        # particular column -- captioned as "did not reach statistical
+        # significance", which is wrong: no significance test was ever run
+        # for a column eligibility itself excludes from testing.
+        print(f'Warning: --report-metadata-column "{report_column}" is not an eligible categorical column '
+              f'(>=2 distinct values, >=2 samples each) in {metadata_file} -- falling back to auto-selecting '
+              f'an eligible column instead.')
         report_column = None
 
     if report_column is None:
-        eligible = metadata_utils.eligible_categorical_columns(metadata_file, final_sample_ids)
-        report_column = eligible[0] if eligible else None
+        report_column = eligible_columns[0] if eligible_columns else None
 
     pdf = _ReportPDF()
     pdf.set_auto_page_break(auto=True, margin=15)

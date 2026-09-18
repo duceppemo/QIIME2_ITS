@@ -80,6 +80,26 @@ def class_sizes(path, column, sample_ids):
     return dict(counts)
 
 
+def final_sample_ids(sample_frequencies, fallback_sample_ids):
+    """Sample ids to use for group-eligibility calculations (class_sizes,
+    eligible_categorical_columns, etc.): every sample_frequencies key with a
+    nonzero frequency, or every id in `fallback_sample_ids` if
+    sample_frequencies is empty (its export is missing -- an older output
+    folder, or a --skip-advanced-stats run).
+
+    Deliberately keyed on sample_frequencies being empty, not on the
+    filtered result being empty: a near-empty input sample can survive
+    DADA2 as a zero-read row (retain-all-samples defaults to True), and
+    those must be excluded from group-eligibility counts. If every sample
+    happened to end up zero-read, falling back to "use every sample
+    anyway" would silently un-exclude them all instead of correctly
+    reporting nothing eligible.
+    """
+    if not sample_frequencies:
+        return list(fallback_sample_ids)
+    return [sid for sid, freq in sample_frequencies.items() if freq > 0]
+
+
 def eligible_categorical_columns(path, sample_ids, min_per_group=2):
     """Categorical columns with >=2 distinct values, each held by at least
     `min_per_group` of the given `sample_ids`. Preserves metadata-file column

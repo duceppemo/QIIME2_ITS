@@ -208,11 +208,7 @@ class Pipeline:
         sample_freq_path = self.output_folder / 'sample_frequencies' / 'metadata.tsv'
         sample_frequencies = (report_data.parse_sample_frequencies(sample_freq_path)
                                if sample_freq_path.exists() else {})
-        # A near-empty input sample can survive DADA2 as a zero-read row
-        # (retain-all-samples defaults to True); it must not count toward
-        # group eligibility for alpha/beta-group-significance/classify-samples.
-        final_sample_ids = [sid for sid, freq in sample_frequencies.items() if freq > 0] \
-            or list(self.sample_dict)
+        final_sample_ids = metadata_utils.final_sample_ids(sample_frequencies, self.sample_dict)
 
         if metadata_utils.has_alpha_group_significance_column(self.metadata_file, final_sample_ids):
             print('Testing alpha diversity group significance...')

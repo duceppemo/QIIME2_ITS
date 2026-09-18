@@ -143,4 +143,13 @@ def build_run_metadata(*, qiime2_its_version, command_line, start_time, end_time
 
 
 def write_run_metadata(path, run_metadata):
-    Path(path).write_text(json.dumps(run_metadata, indent=2, default=str))
+    """Written via a temp file + atomic rename (matching fastq_utils.py's/
+    biom_utils.py's own .tmp-then-replace() convention): a process killed or
+    a disk that fills up mid-write leaves the *old* run_metadata.json (or
+    none) in place, never a half-written, unparseable one -- report_data.
+    parse_run_metadata() would otherwise have no clean way to tell "this run
+    never finished writing it" apart from "this run wrote garbage"."""
+    path = Path(path)
+    tmp_path = path.with_name(path.name + '.tmp')
+    tmp_path.write_text(json.dumps(run_metadata, indent=2, default=str))
+    tmp_path.replace(path)
