@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from qiime2_its.cli import train_ncbi
@@ -69,11 +71,41 @@ class TestRun:
         train_ncbi.run('some query', output_folder, 4, 'a@b.com', None,
                         tmp_path / 'taxdump.tar.gz', tmp_path / 'acc2taxid.gz', tmp_path / 'dead.gz')
 
-        mock_pipeline['import_seq'].assert_called_once()
-        mock_pipeline['import_taxo'].assert_called_once()
-        mock_pipeline['train'].assert_called_once()
-        classifier_path = mock_pipeline['train'].call_args.args[2]
-        assert str(classifier_path).endswith('seq_ncbi.qza')
+        seq_file = output_folder / 'seq.fasta'
+        qiime2_seq = output_folder / 'seq.fasta.qza'
+        taxonomy_file = output_folder / 'taxonomy.txt'
+        qiime2_taxo = output_folder / 'taxonomy.txt.qza'
+        classifier_file = output_folder / 'seq_ncbi.qza'
+        # Regression coverage: each import call must get its own file (the
+        # downloaded seq.fasta vs. the written taxonomy.txt), not each
+        # other's -- assert_called_once() alone can't catch that mixup.
+        mock_pipeline['import_seq'].assert_called_once_with(seq_file, qiime2_seq)
+        mock_pipeline['import_taxo'].assert_called_once_with(taxonomy_file, qiime2_taxo)
+        mock_pipeline['train'].assert_called_once_with(qiime2_seq, qiime2_taxo, classifier_file)
+
+    def test_live_and_dead_accession2taxid_are_merged_not_overwritten(self, tmp_path, mock_pipeline, mocker):
+        """Regression-shaped coverage: dead_nucl.accession2taxid.gz entries
+        must be merged into (not replace) the ones already found in
+        nucl_gb.accession2taxid.gz -- accessions_to_taxids() needs to see
+        both, not just whichever accession2taxid file was parsed last."""
+        def _parse_accession2taxid(path, acc_dict):
+            # Path(path).name, not str(path): tmp_path's own directory is
+            # derived from this test's name (which contains "dead"), so a
+            # substring check against the full path would false-match the
+            # *live* acc2taxid.gz too.
+            return {'ACC2': '2002'} if Path(path).name.startswith('dead') else {'ACC1': '1001'}
+
+        mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.parse_accession2taxid',
+                      side_effect=_parse_accession2taxid)
+        accessions_to_taxids = mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.accessions_to_taxids',
+                                             return_value=[])
+        output_folder = tmp_path / 'out'
+
+        train_ncbi.run('some query', output_folder, 4, 'a@b.com', None,
+                        tmp_path / 'taxdump.tar.gz', tmp_path / 'acc2taxid.gz', tmp_path / 'dead.gz')
+
+        acc2taxid_dict = accessions_to_taxids.call_args.args[1]
+        assert acc2taxid_dict == {'ACC1': '1001', 'ACC2': '2002'}
 
     def test_reuses_existing_seq_fasta_when_the_query_hash_matches(self, tmp_path, mock_pipeline, mocker, capsys):
         """A prior run for the *same* query recorded its fingerprint

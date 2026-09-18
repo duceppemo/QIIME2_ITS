@@ -41,31 +41,73 @@ def test_train_naive_bayes_classifier_verbose(mock_run):
 
 def test_import_fastq_se(mock_run):
     qiime_wrapper.import_fastq_se('reads/', 'reads.qza')
-    cmd = mock_run.call_args.args[0]
-    assert 'SampleData[SequencesWithQuality]' in cmd
-    assert 'CasavaOneEightSingleLanePerSampleDirFmt' in cmd
+    mock_run.assert_called_once_with(
+        ['qiime', 'tools', 'import',
+         '--type', 'SampleData[SequencesWithQuality]',
+         '--input-format', 'CasavaOneEightSingleLanePerSampleDirFmt',
+         '--input-path', 'reads/', '--output-path', 'reads.qza'],
+        check=True)
 
 
 def test_import_fastq_pe(mock_run):
     qiime_wrapper.import_fastq_pe('reads/', 'reads.qza')
-    cmd = mock_run.call_args.args[0]
-    assert 'SampleData[PairedEndSequencesWithQuality]' in cmd
+    mock_run.assert_called_once_with(
+        ['qiime', 'tools', 'import',
+         '--type', 'SampleData[PairedEndSequencesWithQuality]',
+         '--input-format', 'CasavaOneEightSingleLanePerSampleDirFmt',
+         '--input-path', 'reads/', '--output-path', 'reads.qza'],
+        check=True)
 
 
 def test_dada2_denoise_single_no_trimming(mock_run):
     qiime_wrapper.dada2_denoise_single('r.qza', 'rep.qza', 't.qza', 's.qza', 'bts.qza')
-    cmd = mock_run.call_args.args[0]
-    assert '--p-trim-left' in cmd and cmd[cmd.index('--p-trim-left') + 1] == '0'
-    assert '--p-trunc-len' in cmd and cmd[cmd.index('--p-trunc-len') + 1] == '0'
-    assert '--o-base-transition-stats' in cmd and cmd[cmd.index('--o-base-transition-stats') + 1] == 'bts.qza'
+    # Full-list equality, not per-flag lookups: the latter can't catch e.g.
+    # --o-table and --o-denoising-stats being swapped, since both checks
+    # would still find *a* flag at *some* index and never compare the two
+    # output paths against each other.
+    mock_run.assert_called_once_with(
+        ['qiime', 'dada2', 'denoise-single',
+         '--p-n-threads', '0',
+         '--p-trim-left', '0',
+         '--p-trunc-len', '0',
+         '--p-max-ee', '2.0',
+         '--p-trunc-q', '2',
+         '--p-pooling-method', 'independent',
+         '--p-chimera-method', 'consensus',
+         '--p-min-fold-parent-over-abundance', '1.0',
+         '--p-no-allow-one-off',
+         '--p-n-reads-learn', '1000000',
+         '--i-demultiplexed-seqs', 'r.qza',
+         '--o-representative-sequences', 'rep.qza',
+         '--o-table', 't.qza',
+         '--o-denoising-stats', 's.qza',
+         '--o-base-transition-stats', 'bts.qza'],
+        check=True)
 
 
 def test_dada2_denoise_paired_no_trimming(mock_run):
     qiime_wrapper.dada2_denoise_paired('r.qza', 'rep.qza', 't.qza', 's.qza', 'bts.qza')
-    cmd = mock_run.call_args.args[0]
-    for flag in ('--p-trim-left-f', '--p-trim-left-r', '--p-trunc-len-f', '--p-trunc-len-r'):
-        assert flag in cmd and cmd[cmd.index(flag) + 1] == '0'
-    assert '--o-base-transition-stats' in cmd and cmd[cmd.index('--o-base-transition-stats') + 1] == 'bts.qza'
+    mock_run.assert_called_once_with(
+        ['qiime', 'dada2', 'denoise-paired',
+         '--p-n-threads', '0',
+         '--p-trim-left-f', '0',
+         '--p-trim-left-r', '0',
+         '--p-trunc-len-f', '0',
+         '--p-trunc-len-r', '0',
+         '--p-max-ee-f', '2.0',
+         '--p-max-ee-r', '2.0',
+         '--p-trunc-q', '2',
+         '--p-pooling-method', 'independent',
+         '--p-chimera-method', 'consensus',
+         '--p-min-fold-parent-over-abundance', '1.0',
+         '--p-no-allow-one-off',
+         '--p-n-reads-learn', '1000000',
+         '--i-demultiplexed-seqs', 'r.qza',
+         '--o-representative-sequences', 'rep.qza',
+         '--o-table', 't.qza',
+         '--o-denoising-stats', 's.qza',
+         '--o-base-transition-stats', 'bts.qza'],
+        check=True)
 
 
 def test_dada2_denoise_single_defaults_match_qiime2(mock_run):
@@ -104,10 +146,18 @@ def test_core_diversity_actually_runs(mock_run):
     """Regression test: the original code built this command but never called
     subprocess.run(), so the core-diversity step silently no-op'd."""
     qiime_wrapper.core_diversity(4, 'metadata.tsv', 'rooted.qza', 'table.qza', 'out')
-    mock_run.assert_called_once()
-    cmd = mock_run.call_args.args[0]
-    assert cmd[:3] == ['qiime', 'diversity', 'core-metrics-phylogenetic']
-    assert '--output-dir' in cmd and cmd[cmd.index('--output-dir') + 1] == 'out/core-metrics-results'
+    # Full-list equality: '--i-phylogeny' in cmd / '--i-table' in cmd alone
+    # can't catch the two values (rooted.qza / table.qza) being swapped --
+    # both flags would still be found, just each pointing at the other's file.
+    mock_run.assert_called_once_with(
+        ['qiime', 'diversity', 'core-metrics-phylogenetic',
+         '--p-n-jobs-or-threads', '4',
+         '--p-sampling-depth', '1000',
+         '--i-phylogeny', 'rooted.qza',
+         '--i-table', 'table.qza',
+         '--m-metadata-file', 'metadata.tsv',
+         '--output-dir', 'out/core-metrics-results'],
+        check=True)
 
 
 def test_all_wrapper_calls_use_check_true(mock_run):

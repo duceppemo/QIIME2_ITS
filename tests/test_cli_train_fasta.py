@@ -54,8 +54,21 @@ def test_full_run_orchestrates_expected_calls(tmp_path, mocker):
     train_fasta.run(fasta, id_table, output_folder, taxdump=taxdump_path)
 
     mock_extract.assert_called_once_with(taxdump_path, output_folder)
-    mock_write_taxo.assert_called_once()
-    mock_import_seq.assert_called_once()
-    mock_import_taxo.assert_called_once()
-    mock_train.assert_called_once()
-    assert mock_train.call_args.kwargs.get('verbose') is True
+
+    taxonomy_file = output_folder / 'taxonomy.txt'
+    mock_write_taxo.assert_called_once_with(
+        {'1001': 'ACC1'}, taxonomy_file,
+        output_folder / 'nodes.dmp', output_folder / 'names.dmp', output_folder / 'merged.dmp')
+
+    # Regression coverage: import_sequences/import_taxonomy/
+    # train_naive_bayes_classifier must each get the right file for the
+    # right argument (the raw fasta vs. the written taxonomy.txt, and their
+    # imported .qza counterparts) -- assert_called_once() alone doesn't
+    # catch e.g. import_taxonomy being handed the sequence fasta instead of
+    # taxonomy.txt.
+    qiime2_seq = output_folder / 'seqs.qza'
+    qiime2_taxo = output_folder / 'taxonomy.txt.qza'
+    mock_import_seq.assert_called_once_with(fasta, qiime2_seq)
+    mock_import_taxo.assert_called_once_with(taxonomy_file, qiime2_taxo)
+    mock_train.assert_called_once_with(
+        qiime2_seq, qiime2_taxo, output_folder / 'naive-bayes_classifier.qza', verbose=True)

@@ -134,8 +134,13 @@ class TestParseAlphaGroupSignificance:
 
 
 def _write_beta_group_significance_qzv(path, overview_rows):
+    # Real q2templates output (pandas DataFrame.to_html(), verified against
+    # the installed q2-diversity env) puts each <td> on its own indented
+    # line after its <th>, not immediately adjacent -- a fixture with them
+    # directly adjacent can't tell _BETA_ROW_RE's '\s*' apart from no
+    # whitespace handling at all.
     html = '<html><body><table>' + ''.join(
-        f'<th>{k}</th><td>{v}</td>' for k, v in overview_rows.items()
+        f'<tr>\n      <th>{k}</th>\n      <td>{v}</td>\n    </tr>' for k, v in overview_rows.items()
     ) + '</table></body></html>'
     with zipfile.ZipFile(path, 'w') as zf:
         zf.writestr('uuid5678/data/index.html', html)
@@ -226,6 +231,14 @@ class TestParseRarefactionCurve:
             'sampleA': {
                 'depth-1_iter-1': '1.0', 'depth-1_iter-2': '1.0',
                 'depth-5_iter-1': '3.0', 'depth-5_iter-2': '5.0',
+                # A real per-metric CSV export (verified against the
+                # installed q2-diversity env: alpha rarefaction's visualizer
+                # does `data.join(metadata.to_dataframe())` before writing
+                # the CSV) has metadata columns alongside the depth-* ones --
+                # without one here, the depth_cols = [... startswith('depth-')
+                # ...] filter is never actually exercised against a column it
+                # needs to exclude.
+                'site': 'siteA',
             },
         })
         curves = report_data.parse_rarefaction_curve(qzv, 'observed_features')
@@ -236,8 +249,8 @@ class TestParseRarefactionCurve:
         should be skipped, not treated as zero."""
         qzv = tmp_path / 'raref.qzv'
         _write_rarefaction_qzv(qzv, 'shannon', {
-            'sampleA': {'depth-1_iter-1': '1.0'},
-            'sampleB': {},  # blank at every depth column
+            'sampleA': {'depth-1_iter-1': '1.0', 'site': 'siteA'},
+            'sampleB': {'site': 'siteB'},  # blank at every depth column
         })
         curves = report_data.parse_rarefaction_curve(qzv, 'shannon')
         assert curves['sampleB'] == []

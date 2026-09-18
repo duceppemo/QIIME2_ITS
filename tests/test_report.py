@@ -12,6 +12,31 @@ import zipfile
 from qiime2_its import report
 
 
+def _page_titles(mocker):
+    """Spy on every _ReportPDF page-adding method (add_title_page,
+    add_table_page, add_keyvalue_page, add_figure_page -- title is always
+    their first argument after self) and return a list that accumulates
+    each one's title, in call order, as build_report() runs. Lets
+    TestBuildReport assert on which sections actually made it into the
+    report instead of only on the resulting PDF's byte size, which stays
+    roughly stable (or even grows) whether or not a given section's code
+    path actually ran -- e.g. dropping the classifier-results table
+    entirely, or never emitting the alpha boxplot pages, changes the PDF by
+    only a few hundred bytes against a report that's otherwise many
+    matplotlib figures, well within the noise `> 1000 bytes`-style
+    assertions can't see."""
+    titles = []
+    for method_name in ('add_title_page', 'add_table_page', 'add_keyvalue_page', 'add_figure_page'):
+        original = getattr(report._ReportPDF, method_name)
+
+        def wrapper(self, title, *args, _original=original, **kwargs):
+            titles.append(title)
+            return _original(self, title, *args, **kwargs)
+
+        mocker.patch.object(report._ReportPDF, method_name, wrapper)
+    return titles
+
+
 def _write_alpha_qzv(path, column_stats):
     with zipfile.ZipFile(path, 'w') as zf:
         for column, (h, p, groups) in column_stats.items():
@@ -22,8 +47,12 @@ def _write_alpha_qzv(path, column_stats):
 
 
 def _write_beta_qzv(path, overview_rows):
+    # Real q2templates output (pandas DataFrame.to_html()) puts each <td> on
+    # its own indented line after its <th>, not directly adjacent -- see the
+    # matching comment in test_report_data.py's _write_beta_group_significance_qzv.
     html = '<html><body><table>' + ''.join(
-        f'<th>{k}</th><td>{v}</td>' for k, v in overview_rows.items()) + '</table></body></html>'
+        f'<tr>\n      <th>{k}</th>\n      <td>{v}</td>\n    </tr>' for k, v in overview_rows.items()
+    ) + '</table></body></html>'
     with zipfile.ZipFile(path, 'w') as zf:
         zf.writestr('uuid2/data/index.html', html)
 
@@ -165,12 +194,18 @@ class TestSignificantColumns:
 class TestSignificanceNote:
     def test_significant_column_gets_the_significance_reason(self):
         note = report._significance_note('site', ['site'])
-        assert 'significant' in note
+        # 'significant' alone is vacuous: it also appears in the
+        # non-significant branch's own wording ("did not reach statistical
+        # significance"), so it can't tell the two branches apart. The
+        # phrase below only appears in the significant branch.
+        assert 'came back statistically significant' in note
+        assert 'default' not in note
         assert 'site' in note
 
     def test_non_significant_default_column_gets_the_default_reason(self):
         note = report._significance_note('site', [])
         assert 'default' in note
+        assert 'came back statistically significant' not in note
 
 
 class TestFitCellText:
@@ -245,6 +280,36 @@ class TestPcoaFigure:
         assert len(markers) > 1
         plt.close(fig)
 
+    def test_each_group_gets_its_own_mapped_color(self):
+        """The metadata->color mapping otherwise has no direct coverage --
+        e.g. every group being plotted in the same (say, first palette)
+        color would pass every other test in this class."""
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        sample_coords = {'sampleA': (0.1, 0.1), 'sampleB': (-0.1, -0.1)}
+        metadata_table = {'sampleA': {'site': 'siteA'}, 'sampleB': {'site': 'siteB'}}
+        group_color = {'siteA': '#111111', 'siteB': '#222222'}
+        fig = report._pcoa_figure(sample_coords, (0.5, 0.2), metadata_table, 'site', 'title',
+                                   group_color=group_color)
+        ax = fig.axes[0]
+        colors_by_group = {coll.get_label(): tuple(coll.get_facecolor()[0]) for coll in ax.collections}
+        assert colors_by_group['siteA'] == mcolors.to_rgba('#111111', alpha=0.7)
+        assert colors_by_group['siteB'] == mcolors.to_rgba('#222222', alpha=0.7)
+        plt.close(fig)
+
+    def test_axis_labels_use_the_matching_proportion_explained_value(self):
+        """Regression-shaped coverage: PC1's label must show
+        proportion_explained[0], PC2's proportion_explained[1] -- swapped
+        would silently mislabel which axis explains how much variance."""
+        import matplotlib.pyplot as plt
+        sample_coords = {'sampleA': (0.1, 0.2), 'sampleB': (-0.1, -0.2)}
+        metadata_table = {'sampleA': {'site': 'siteA'}, 'sampleB': {'site': 'siteB'}}
+        fig = report._pcoa_figure(sample_coords, (0.83, 0.17), metadata_table, 'site', 'title')
+        ax = fig.axes[0]
+        assert '83.0%' in ax.get_xlabel()
+        assert '17.0%' in ax.get_ylabel()
+        plt.close(fig)
+
 
 class TestDendrogramFigure:
     def test_builds_a_figure_with_one_axes(self):
@@ -285,6 +350,27 @@ class TestDendrogramFigure:
         fig = report._dendrogram_figure(distance_df, {}, None, 'title')
         labels = {t.get_text() for t in fig.axes[0].get_yticklabels()}
         assert labels == set(ids)
+        plt.close(fig)
+
+    def test_leaf_label_color_matches_the_samples_group(self):
+        """The metadata->color mapping otherwise has no direct coverage --
+        e.g. removing the tick_label.set_color(...) call entirely (leaving
+        every label at matplotlib's default black) would pass every other
+        test in this class."""
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        distance_df = pd.DataFrame(
+            [[0.0, 0.3, 0.6], [0.3, 0.0, 0.5], [0.6, 0.5, 0.0]],
+            index=['sampleA', 'sampleB', 'sampleC'], columns=['sampleA', 'sampleB', 'sampleC'])
+        metadata_table = {'sampleA': {'site': 'siteA'}, 'sampleB': {'site': 'siteA'},
+                           'sampleC': {'site': 'siteB'}}
+        group_color = {'siteA': '#111111', 'siteB': '#222222'}
+        fig = report._dendrogram_figure(distance_df, metadata_table, 'site', 'title', group_color=group_color)
+        ax = fig.axes[0]
+        colors_by_sample = {t.get_text(): t.get_color() for t in ax.get_xticklabels()}
+        assert colors_by_sample['sampleA'] == '#111111'
+        assert colors_by_sample['sampleB'] == '#111111'
+        assert colors_by_sample['sampleC'] == '#222222'
         plt.close(fig)
 
 
@@ -572,20 +658,43 @@ class TestRunMetadataRows:
 
 
 class TestBuildReport:
-    def test_produces_a_valid_multi_page_pdf(self, tmp_path):
+    def test_produces_a_valid_multi_page_pdf_with_every_expected_section(self, tmp_path, mocker):
         output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
+        titles = _page_titles(mocker)
 
         report_path = report.build_report(output_folder, metadata_path)
 
         assert report_path == output_folder / 'report.pdf'
-        assert report_path.stat().st_size > 1000
         assert report_path.read_bytes()[:4] == b'%PDF'
+        # One title per section the synthetic fixture provides data for --
+        # a byte-size/page-count proxy can't tell "every section rendered"
+        # apart from "one section silently never ran but the PDF is still
+        # plausibly sized" (e.g. a typo'd qzv glob, or a dropped `if
+        # classifier_rows:` block).
+        for expected in ('DADA2 read retention',
+                          'Alpha diversity group significance (Kruskal-Wallis)',
+                          'Alpha diversity by site',
+                          'Beta diversity group significance (PERMANOVA)',
+                          'site: Bray-Curtis PCoA',
+                          'site: Bray-Curtis sample clustering',
+                          'Genus-level relative abundance',
+                          'Rarefaction curve',
+                          'Sample classifier results'):
+            assert expected in titles, f'missing page: {expected!r}'
 
-    def test_auto_picks_first_eligible_column_when_not_specified(self, tmp_path):
+    def test_auto_picks_first_eligible_column_when_not_specified(self, tmp_path, mocker):
         output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
-        # Should not raise, and should pick up 'site' automatically.
+        titles = _page_titles(mocker)
+
         report_path = report.build_report(output_folder, metadata_path, report_column=None)
+
         assert report_path.exists()
+        # Not just "didn't raise" -- 'site' (the fixture's only eligible
+        # column) must actually have been picked and driven real pages,
+        # not silently landed on report_column=None (which would still
+        # produce a same-sized-ish PDF, just missing every site-grouped page).
+        assert 'Alpha diversity by site' in titles
+        assert 'site: Bray-Curtis PCoA' in titles
 
     def test_invalid_report_column_falls_back_with_a_warning_instead_of_degrading_silently(self, tmp_path, capsys):
         """Regression test: a typo'd/nonexistent --report-metadata-column
@@ -624,13 +733,11 @@ class TestBuildReport:
         assert 'elevation' in out
         assert 'eligible' in out
 
-    def test_significant_non_default_column_adds_its_own_pages(self, tmp_path):
+    def test_significant_non_default_column_adds_its_own_pages(self, tmp_path, mocker):
         """A metadata column other than the default/auto-picked one, but
         that comes back statistically significant, should get its own
         PCoA/dendrogram pages too -- not just the default column's."""
         output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
-        baseline_path = report.build_report(output_folder, metadata_path)
-        baseline_size = baseline_path.stat().st_size
 
         # Add a second metadata column with a genuinely significant result,
         # distinct from 'site' (the auto-picked default for this fixture).
@@ -643,14 +750,19 @@ class TestBuildReport:
             'method name': 'PERMANOVA', 'test statistic name': 'pseudo-F',
             'sample size': '4', 'number of groups': '2', 'test statistic': '9.0', 'p-value': '0.01',
         })
+        titles = _page_titles(mocker)
 
         report_path = report.build_report(output_folder, metadata_path)
 
         assert report_path.exists()
-        # A rough but real proxy for "extra pages were actually added": the
-        # significant-column run has strictly more PCoA/dendrogram content
-        # than the baseline run of the same otherwise-identical fixture.
-        assert report_path.stat().st_size > baseline_size
+        # The actual claim the docstring makes -- not a PDF-size proxy,
+        # which a broken `beta_columns = sorted({report_column})` (i.e.
+        # significant columns never added) doesn't move enough to notice:
+        # the extra PERMANOVA table row alone grows the PDF regardless of
+        # whether treatment's own PCoA/dendrogram pages were ever built.
+        assert 'treatment: Bray-Curtis PCoA' in titles
+        assert 'treatment: Bray-Curtis sample clustering' in titles
+        assert 'site: Bray-Curtis PCoA' in titles  # the default column's pages still there too
 
     def test_works_with_missing_optional_artifacts(self, tmp_path):
         """A --skip-advanced-stats run won't have any of the group-

@@ -89,9 +89,27 @@ class TestFinalSampleIds:
 
 class TestEligibleCategoricalColumns:
     def test_excludes_numeric_columns(self, metadata_with_types):
+        """'ph' in this fixture is both numeric-typed AND has all-unique
+        values (5.8/5.9/6.4), so this alone can't tell whether the type
+        check or the group-count check is what excludes it -- see the
+        dedicated test below for a fixture that isolates the type check."""
         eligible = metadata_utils.eligible_categorical_columns(
             metadata_with_types, ['sampleA', 'sampleB', 'sampleC'])
         assert 'ph' not in eligible
+
+    def test_excludes_numeric_columns_even_with_repeated_values(self, tmp_path):
+        """A numeric column with a repeated value (here, replicate numbers
+        1,1,2,2 -- two groups of 2, which would otherwise satisfy the
+        eligibility rule) isolates the type check: without it, this column
+        would read as eligible on group counts alone."""
+        path = tmp_path / 'metadata.tsv'
+        path.write_text(
+            'sample-id\treplicate-number\n#q2:types\tnumeric\n'
+            'sampleA\t1\nsampleB\t1\nsampleC\t2\nsampleD\t2\n'
+        )
+        eligible = metadata_utils.eligible_categorical_columns(
+            path, ['sampleA', 'sampleB', 'sampleC', 'sampleD'])
+        assert eligible == []
 
     def test_excludes_columns_with_a_singleton_group(self, metadata_with_types):
         """'replicate' has values 1,2,1 across 3 samples -- '2' is a group of
@@ -122,11 +140,26 @@ class TestEligibleCategoricalColumns:
             path, ['sampleA', 'sampleB', 'sampleC', 'sampleD'], min_per_group=3)
         assert eligible == []
 
-    def test_only_considers_given_sample_ids(self, metadata_with_types):
-        """A near-empty/excluded sample shouldn't count toward group eligibility."""
-        eligible = metadata_utils.eligible_categorical_columns(
-            metadata_with_types, ['sampleA', 'sampleC'])  # sampleB excluded
-        assert 'site' not in eligible  # siteA now has only 1 member (sampleA)
+    def test_only_considers_given_sample_ids(self, tmp_path):
+        """A near-empty/excluded sample shouldn't count toward group
+        eligibility -- verified by a fixture where excluding one sample
+        actually flips the result: with all 4 samples, 'site' has two
+        groups of 2 (eligible); excluding sampleD drops siteB to a
+        singleton, and only one group is then >= min_per_group (not
+        eligible). (A fixture where exclusion can't change the outcome
+        either way doesn't prove sample_ids is actually being applied.)"""
+        path = tmp_path / 'metadata.tsv'
+        path.write_text(
+            'sample-id\tsite\n#q2:types\tcategorical\n'
+            'sampleA\tsiteA\nsampleB\tsiteA\nsampleC\tsiteB\nsampleD\tsiteB\n'
+        )
+        eligible_all = metadata_utils.eligible_categorical_columns(
+            path, ['sampleA', 'sampleB', 'sampleC', 'sampleD'])
+        assert 'site' in eligible_all
+
+        eligible_excluding_sampleD = metadata_utils.eligible_categorical_columns(
+            path, ['sampleA', 'sampleB', 'sampleC'])
+        assert 'site' not in eligible_excluding_sampleD
 
 
 class TestHasAlphaGroupSignificanceColumn:
@@ -152,3 +185,20 @@ class TestHasAlphaGroupSignificanceColumn:
         )
         assert metadata_utils.has_alpha_group_significance_column(
             path, ['sampleA', 'sampleB', 'sampleC']) is True
+
+    def test_excluded_sample_does_not_count_toward_the_repeat(self, tmp_path):
+        """A sample outside sample_ids must not count toward the
+        repeated-value check -- verified by a fixture where excluding the
+        one sample that creates the repeat actually flips the result from
+        True to False (sampleA/sampleB both 'A' when both count; excluding
+        sampleB leaves every remaining value unique)."""
+        path = tmp_path / 'metadata.tsv'
+        path.write_text(
+            'sample-id\tcondition\n#q2:types\tcategorical\n'
+            'sampleA\tA\nsampleB\tA\nsampleC\tB\n'
+        )
+        assert metadata_utils.has_alpha_group_significance_column(
+            path, ['sampleA', 'sampleB', 'sampleC']) is True
+
+        assert metadata_utils.has_alpha_group_significance_column(
+            path, ['sampleA', 'sampleC']) is False

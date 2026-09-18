@@ -82,6 +82,12 @@ class TestTaxdumpParsing:
         )
         names = tmp_path / 'names.dmp'
         names.write_text(
+            # A real names.dmp has several rows per taxid (synonym, authority,
+            # blast name, ...), not just 'scientific name' -- this synonym row
+            # for 4751, deliberately placed before its scientific-name row,
+            # exercises the 'scientific name' filter: without it, taxid 4751
+            # would resolve to "Fungi (fungal organisms)" instead of "Fungi".
+            '4751\t|\tFungi (fungal organisms)\t|\t\t|\tsynonym\t|\n'
             '4751\t|\tFungi\t|\t\t|\tscientific name\t|\n'
             '33154\t|\tOpisthokonta\t|\t\t|\tscientific name\t|\n'
             '4890\t|\tAscomycota\t|\t\t|\tscientific name\t|\n'

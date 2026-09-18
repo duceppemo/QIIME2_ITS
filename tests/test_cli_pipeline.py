@@ -164,10 +164,18 @@ class TestPipelineChecks:
         size_select_pe_parallel both index reads[1] with no length check)."""
         monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
         pipeline = _make_pipeline(mocker, tmp_path, se=False, pe=True)
-        # _make_pipeline already appended one R1-only fastq for "sample" --
-        # paired mode with no R2 for it is exactly the broken case.
+        # Replace the fixture's generic R1-only "sample" with a distinctively
+        # named one, so the assertion below can verify the *offending sample
+        # id* made it into the message -- not just that the word "sample"
+        # (present in the message's own generic wording, "sample(s)") shows
+        # up somewhere, which would pass even if the id list were dropped
+        # from the message entirely.
+        r1 = tmp_path / 'siteD-rep9_S9_L001_R1_001.fastq.gz'
+        with gzip.open(r1, 'wt') as f:
+            f.write('@r1\nACGT\n+\nIIII\n')
+        pipeline.fastq_list = [r1]
 
-        with pytest.raises(ValueError, match='sample'):
+        with pytest.raises(ValueError, match='siteD-rep9'):
             pipeline.checks()
 
     def test_complete_pairs_are_not_rejected(self, mocker, tmp_path, monkeypatch):

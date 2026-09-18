@@ -112,11 +112,24 @@ class TestRun:
 
         train_unite.run(str(archive), output_folder, 'rachis-qiime2-2026.7')
 
-        mock_import_seq.assert_called_once()
-        mock_import_taxo.assert_called_once()
-        mock_train.assert_called_once()
-        classifier_path = mock_train.call_args.args[2]
-        assert str(classifier_path).endswith('unite-ver10-99-classifier-19.02.2025.qza')
+        developer_dir = output_folder / 'developer'
+        unite_seq = developer_dir / 'sh_refs_qiime_ver10_99_19.02.2025.fasta'
+        unite_taxo = developer_dir / 'sh_taxonomy_qiime_ver10_99_19.02.2025.txt'
+        unite_seq_fixed = unite_seq.with_name(unite_seq.stem + '_upper.fasta')
+        qiime2_seq = unite_seq_fixed.with_suffix(unite_seq_fixed.suffix + '.qza')
+        qiime2_taxo = unite_taxo.with_suffix(unite_taxo.suffix + '.qza')
+        classifier_file = output_folder / 'unite-ver10-99-classifier-19.02.2025.qza'
+
+        # Regression coverage: import_sequences must get the *proofread*
+        # (fix_fasta output) fasta, not the original raw UNITE download --
+        # assert_called_once() alone doesn't catch import_sequences being
+        # handed unite_seq instead of unite_seq_fixed, which would make
+        # fix_fasta's whitespace/upper-casing pass a no-op for the
+        # classifier QIIME2 actually trains on.
+        mock_import_seq.assert_called_once_with(unite_seq_fixed, qiime2_seq)
+        mock_import_taxo.assert_called_once_with(unite_taxo, qiime2_taxo)
+        mock_train.assert_called_once_with(qiime2_seq, qiime2_taxo, classifier_file)
+        assert unite_seq_fixed.read_text() == '>a\nACGT\n'  # fix_fasta actually ran (upper-cased)
 
     def test_warns_when_declared_env_does_not_match_the_active_one(self, tmp_path, mocker, capsys):
         """Regression test: -q/--qiime2 used to be parsed but never passed to

@@ -13,6 +13,7 @@ def test_min_and_max_len_both_included(mock_run):
     cmd = mock_run.call_args.args[0]
     assert 'minlength=100' in cmd
     assert 'maxlength=300' in cmd
+    assert 'out=out/r1.fastq.gz' in cmd  # not just that filtering flags exist -- the output path itself
 
 
 def test_max_len_zero_omits_maxlength_flag(mock_run):
@@ -22,6 +23,7 @@ def test_max_len_zero_omits_maxlength_flag(mock_run):
     cmd = mock_run.call_args.args[0]
     assert 'minlength=100' in cmd
     assert not any(arg.startswith('maxlength=') for arg in cmd)
+    assert 'out=out/r1.fastq.gz' in cmd
 
 
 def test_min_len_zero_omits_minlength_flag(mock_run):
@@ -29,14 +31,20 @@ def test_min_len_zero_omits_minlength_flag(mock_run):
     cmd = mock_run.call_args.args[0]
     assert not any(arg.startswith('minlength=') for arg in cmd)
     assert 'maxlength=300' in cmd
+    assert 'out=out/r1.fastq.gz' in cmd
 
 
 def test_size_select_pe_includes_both_mates(mock_run):
     size_filter.size_select_pe('r1.fastq.gz', 'r2.fastq.gz', 'out', min_len=50, max_len=0, threads=2)
     cmd = mock_run.call_args.args[0]
-    assert 'in=r1.fastq.gz' in cmd
-    assert 'in2=r2.fastq.gz' in cmd
-    assert any(arg.startswith('out2=') for arg in cmd)
+    # Full-list equality, not "an out2= flag exists somewhere": out=/out2=
+    # swapped (R1 reads written under the R2 filename and vice versa) would
+    # still satisfy `any(arg.startswith('out2='))`, since that only checks a
+    # flag with that prefix exists, not which file it points at.
+    assert cmd == ['bbduk.sh', 'overwrite=t',
+                    'in=r1.fastq.gz', 'in2=r2.fastq.gz',
+                    'out=out/r1.fastq.gz', 'out2=out/r2.fastq.gz',
+                    'minlength=50', 'threads=2']
 
 
 def test_bbduk_version_returns_stderr(mock_run):
