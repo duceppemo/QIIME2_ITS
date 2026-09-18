@@ -226,6 +226,26 @@ class TestColumnWidths:
         assert sum(widths) <= available
 
 
+class TestPcoaFigure:
+    def test_groups_get_distinct_markers_past_one_palette_pass(self):
+        """The scatter series' actual marker (not just group_marker's own
+        mapping) must reflect the group -- this exercises _pcoa_figure's own
+        use of group_marker, not just the pure mapping function."""
+        import matplotlib.pyplot as plt
+        n = len(report._COLORBLIND_PALETTE) + 1
+        sample_ids = [f'sample{i}' for i in range(n)]
+        sample_coords = {sid: (float(i), float(i)) for i, sid in enumerate(sample_ids)}
+        metadata_table = {sid: {'site': f'site{i:02d}'} for i, sid in enumerate(sample_ids)}
+        fig = report._pcoa_figure(sample_coords, (0.5, 0.2), metadata_table, 'site', 'title')
+        ax = fig.axes[0]
+        markers = {tuple(coll.get_paths()[0].vertices.round(3).flatten()) for coll in ax.collections}
+        # n groups, each its own scatter() call -> n distinct path-collections;
+        # at least two different marker shapes once past one palette pass.
+        assert len(ax.collections) == n
+        assert len(markers) > 1
+        plt.close(fig)
+
+
 class TestDendrogramFigure:
     def test_builds_a_figure_with_one_axes(self):
         import matplotlib.pyplot as plt
@@ -286,10 +306,35 @@ class TestGroupColorMap:
         assert report._group_color_map({'sampleA': {'site': 'siteA'}}, None) == {}
 
 
+class TestGroupMarkerMap:
+    def test_groups_within_one_palette_length_all_get_the_first_marker(self):
+        table = {f'sample{i}': {'site': f'site{i}'} for i in range(len(report._COLORBLIND_PALETTE))}
+        marker_map = report._group_marker_map(table, 'site')
+        assert set(marker_map.values()) == {report._MARKER_CYCLE[0]}
+
+    def test_a_group_past_one_full_palette_pass_gets_the_next_marker(self):
+        """The whole point: once there are more groups than palette colors,
+        a group that reuses an earlier group's color must get a different
+        marker so the two are still visually distinguishable."""
+        n = len(report._COLORBLIND_PALETTE) + 1
+        table = {f'sample{i}': {'site': f'site{i:02d}'} for i in range(n)}
+        marker_map = report._group_marker_map(table, 'site')
+        colors = report._group_color_map(table, 'site')
+        groups = sorted(f'site{i:02d}' for i in range(n))
+        first_group, repeated_group = groups[0], groups[len(report._COLORBLIND_PALETTE)]
+        assert colors[first_group] == colors[repeated_group]  # same color, as expected
+        assert marker_map[first_group] != marker_map[repeated_group]  # but different marker
+
+    def test_no_report_column_returns_empty_map(self):
+        assert report._group_marker_map({'sampleA': {'site': 'siteA'}}, None) == {}
+
+
 class TestReadableTextColor:
     def test_pale_color_is_darkened(self):
-        # The palette's yellow -- the concrete color that prompted this:
-        # legible as a dot/bar fill, too pale to read as small text.
+        # The old Okabe-Ito palette's yellow -- the concrete color that
+        # prompted this: legible as a dot/bar fill, too pale to read as
+        # small text. Not in the current palette, but still a valid case
+        # for this function on any pale color, whatever palette is in use.
         darkened = report._readable_text_color('#F0E442')
         assert darkened != '#F0E442'
         r, g, b = (int(darkened[i:i + 2], 16) for i in (1, 3, 5))

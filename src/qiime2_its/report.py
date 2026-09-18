@@ -23,20 +23,31 @@ from scipy.spatial.distance import squareform  # noqa: E402
 
 from qiime2_its import metadata_utils, report_data, timing  # noqa: E402
 
-# Okabe-Ito: the standard colorblind-safe categorical palette (Okabe & Ito
-# 2008; also published as the "Wong" palette, Wong 2011, Nature Methods) --
-# 8 colors chosen to stay distinguishable under the common forms of color
-# vision deficiency. Used for every categorical color in this report instead
-# of matplotlib's default cycle.
+# CARTOColors "Safe" qualitative scheme (https://github.com/CartoDB/CartoColor,
+# tagged "colorblind" in its own source), derived from Paul Tol's colorblind-
+# safe schemes. Confirmed against CartoColor's own source (src/carto.ts) --
+# its "Safe" palette's largest defined set is 11 informative hues (its 12th
+# color, #888888, is a fixed grey always appended as a separate "other"
+# indicator regardless of how many hues are requested, not a 12th rotating
+# category color, so it's excluded here in favor of this report's own
+# _NEUTRAL_GREY_* colors for that role). Replaces the 8-color Okabe-Ito
+# palette used earlier in this report's design: real report columns have
+# run past 8 groups, and more colorblind-safe hues before any repeat back
+# to a color already used is a direct improvement for that case. Used for
+# every categorical color in this report instead of matplotlib's default
+# cycle.
 _COLORBLIND_PALETTE = [
-    '#0072B2',  # blue
-    '#E69F00',  # orange
-    '#009E73',  # bluish green
-    '#CC79A7',  # reddish purple
-    '#D55E00',  # vermillion
-    '#56B4E9',  # sky blue
-    '#F0E442',  # yellow
-    '#000000',  # black
+    '#88CCEE',  # cyan
+    '#CC6677',  # rose
+    '#DDCC77',  # sand
+    '#117733',  # green
+    '#332288',  # indigo
+    '#AA4499',  # purple
+    '#44AA99',  # teal
+    '#999933',  # olive
+    '#882255',  # wine
+    '#661100',  # dark red
+    '#6699CC',  # blue
 ]
 # Fixed, non-cycled colors for a chart's "Other"/"Unclassified" catch-all
 # categories, so neither ever coincides with a real category's color and both
@@ -460,9 +471,31 @@ def _group_color_map(metadata_table, report_column):
     return {group: _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)] for i, group in enumerate(groups)}
 
 
+# Cycled once per full pass through _COLORBLIND_PALETTE (see _group_marker_map)
+# -- 11 colors x 8 markers covers up to 88 groups before a group repeats both
+# its color and its marker, comfortably past any realistic metadata column's
+# cardinality.
+_MARKER_CYCLE = ['o', 's', '^', 'D', 'v', 'P', 'X', '*']
+
+
+def _group_marker_map(metadata_table, report_column):
+    """{group: marker}, using the same group order as _group_color_map so
+    the two stay aligned. A column with more groups than _COLORBLIND_PALETTE
+    has colors makes two groups share a color; cycling the marker shape
+    once per full pass through the palette means any two groups sharing a
+    color always differ in shape instead. Only meaningful for a scatter
+    plot (PCoA) -- the dendrogram encodes group via colored text, which has
+    no marker-shape equivalent."""
+    if not report_column:
+        return {}
+    groups = sorted({row.get(report_column, '?') for row in metadata_table.values()})
+    return {group: _MARKER_CYCLE[(i // len(_COLORBLIND_PALETTE)) % len(_MARKER_CYCLE)]
+            for i, group in enumerate(groups)}
+
+
 def _readable_text_color(hex_color):
     """Darken `hex_color` if it's too pale to read as small text on a white
-    page (the palette's yellow, most visibly) -- used only where a palette
+    page (the palette's sand, most visibly) -- used only where a palette
     color labels text directly (dendrogram leaf labels/legend), never for
     the dots/bars/lines elsewhere that same color fills, which read fine at
     full brightness."""
@@ -474,10 +507,12 @@ def _readable_text_color(hex_color):
     return '#{:02x}{:02x}{:02x}'.format(round(r * scale), round(g * scale), round(b * scale))
 
 
-def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_column, title, group_color=None):
+def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_column, title,
+                  group_color=None, group_marker=None):
     fig, ax = plt.subplots(figsize=(6, 5))
     groups = sorted({metadata_table.get(sid, {}).get(report_column, '?') for sid in sample_coords})
     group_color = group_color if group_color is not None else _group_color_map(metadata_table, report_column)
+    group_marker = group_marker if group_marker is not None else _group_marker_map(metadata_table, report_column)
     for group in groups:
         xs, ys = [], []
         for sid, (x, y) in sample_coords.items():
@@ -488,8 +523,10 @@ def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_col
         # Semi-transparent fill + a thin outline: overlapping points (common
         # with pilot-scale sample counts) stay distinguishable from each
         # other and from a solid single-point marker instead of merging
-        # into one opaque blob.
-        ax.scatter(xs, ys, label=group, color=color, alpha=0.7, s=55,
+        # into one opaque blob. Marker shape (not just color) also encodes
+        # group past _COLORBLIND_PALETTE's length, where two groups
+        # otherwise share a color.
+        ax.scatter(xs, ys, label=group, color=color, marker=group_marker.get(group, 'o'), alpha=0.7, s=55,
                    edgecolors='black', linewidths=0.6)
     ax.set_xlabel(f'PC1 ({proportion_explained[0] * 100:.1f}%)')
     ax.set_ylabel(f'PC2 ({proportion_explained[1] * 100:.1f}%)')
@@ -801,12 +838,20 @@ def build_report(output_folder, metadata_file, report_column=None):
     beta_significant = _significant_columns(beta_pvalues_by_column)
     beta_columns = sorted(set(beta_significant) | ({report_column} if report_column else set()))
     for column in beta_columns:
-        # Computed once per column so the same group gets the same color on
-        # both the PCoA and dendrogram pages, for both distance metrics,
-        # rather than each figure picking its own colors from whatever
-        # subset of samples/groups it happens to see.
+        # Computed once per column so the same group gets the same color
+        # (and, for PCoA, the same marker shape) on both the PCoA and
+        # dendrogram pages, for both distance metrics, rather than each
+        # figure picking its own colors from whatever subset of
+        # samples/groups it happens to see.
         group_color = _group_color_map(metadata_table, column)
+        group_marker = _group_marker_map(metadata_table, column)
         note = _significance_note(column, beta_significant)
+        # Only worth telling the reader about when it actually kicks in --
+        # with few enough groups that every one gets its own palette color,
+        # every marker is a plain circle and the sentence would just be
+        # confusing noise.
+        marker_note = (' Marker shape also distinguishes groups that share a color (this column has '
+                        'more groups than the palette has colors).' if len(set(group_marker.values())) > 1 else '')
         for metric in ('bray_curtis', 'unweighted_unifrac'):
             metric_display = _METRIC_DISPLAY_NAMES.get(metric, metric)
             ordination_path = output_folder / 'core-metrics-results' / f'{metric}_pcoa_export' / 'ordination.txt'
@@ -814,8 +859,8 @@ def build_report(output_folder, metadata_file, report_column=None):
                 sample_coords, proportion_explained = report_data.parse_ordination(ordination_path)
                 pdf.add_figure_page(f'{column}: {metric_display} PCoA', _pcoa_figure(
                     sample_coords, proportion_explained, metadata_table, column,
-                    f'{metric_display} (colored by {column})', group_color=group_color),
-                    intro=_INTRO_PCOA + note)
+                    f'{metric_display} (colored by {column})', group_color=group_color,
+                    group_marker=group_marker), intro=_INTRO_PCOA + marker_note + note)
 
             distance_path = output_folder / 'core-metrics-results' / f'{metric}_distance_export' / \
                 'distance-matrix.tsv'
