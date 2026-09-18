@@ -10,6 +10,7 @@ so it can be unit-tested without matplotlib/fpdf2 involved.
 import importlib.resources
 import io
 import math
+import textwrap
 from pathlib import Path
 
 import matplotlib
@@ -493,6 +494,15 @@ def _group_marker_map(metadata_table, report_column):
             for i, group in enumerate(groups)}
 
 
+def _wrap_legend_label(label, width=18):
+    """Wrap a long legend label onto multiple lines. A single very long
+    metadata value (e.g. "self-heating coal mine waste material") used as
+    one legend entry otherwise forces the whole legend column wide enough
+    to squeeze the actual plot into a fraction of the page -- every other
+    entry pays for the longest one's width whether it needs to or not."""
+    return '\n'.join(textwrap.wrap(str(label), width=width)) or str(label)
+
+
 def _readable_text_color(hex_color):
     """Darken `hex_color` if it's too pale to read as small text on a white
     page (the palette's sand, most visibly) -- used only where a palette
@@ -526,8 +536,8 @@ def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_col
         # into one opaque blob. Marker shape (not just color) also encodes
         # group past _COLORBLIND_PALETTE's length, where two groups
         # otherwise share a color.
-        ax.scatter(xs, ys, label=group, color=color, marker=group_marker.get(group, 'o'), alpha=0.7, s=55,
-                   edgecolors='black', linewidths=0.6)
+        ax.scatter(xs, ys, label=_wrap_legend_label(group), color=color, marker=group_marker.get(group, 'o'),
+                   alpha=0.7, s=55, edgecolors='black', linewidths=0.6)
     ax.set_xlabel(f'PC1 ({proportion_explained[0] * 100:.1f}%)')
     ax.set_ylabel(f'PC2 ({proportion_explained[1] * 100:.1f}%)')
     ax.set_title(title)
@@ -577,7 +587,8 @@ def _dendrogram_figure(distance_df, metadata_table, report_column, title, group_
         for tick_label in tick_labels:
             group = metadata_table.get(tick_label.get_text(), {}).get(report_column, '?')
             tick_label.set_color(text_color.get(group, 'black'))
-        handles = [Line2D([0], [0], color=text_color[group], lw=4, label=group) for group in groups]
+        handles = [Line2D([0], [0], color=text_color[group], lw=4, label=_wrap_legend_label(group))
+                   for group in groups]
         if orientation == 'left':
             # The leaf labels themselves (not just the plotted lines) sit at
             # the right edge of the axes here, so a legend placed just

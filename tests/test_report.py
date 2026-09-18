@@ -329,6 +329,21 @@ class TestGroupMarkerMap:
         assert report._group_marker_map({'sampleA': {'site': 'siteA'}}, None) == {}
 
 
+class TestWrapLegendLabel:
+    def test_short_label_is_unchanged(self):
+        assert report._wrap_legend_label('country') == 'country'
+
+    def test_long_label_is_wrapped_onto_multiple_lines(self):
+        wrapped = report._wrap_legend_label('self-heating coal mine waste material')
+        assert '\n' in wrapped
+        assert all(len(line) <= 18 for line in wrapped.split('\n'))
+
+    def test_wrapping_does_not_drop_or_reorder_words(self):
+        label = 'self-heating coal mine waste material'
+        wrapped = report._wrap_legend_label(label)
+        assert wrapped.replace('\n', ' ') == label
+
+
 class TestReadableTextColor:
     def test_pale_color_is_darkened(self):
         # The old Okabe-Ito palette's yellow -- the concrete color that
