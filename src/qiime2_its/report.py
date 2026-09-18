@@ -9,6 +9,7 @@ so it can be unit-tested without matplotlib/fpdf2 involved.
 """
 import importlib.resources
 import io
+import math
 from pathlib import Path
 
 import matplotlib
@@ -75,6 +76,25 @@ class _ReportPDF(FPDF):
             text = text[:-1]
         return (text + ellipsis) if text else ellipsis
 
+    def _column_widths(self, header, rows):
+        """Size each column to its own content (header + every cell in that
+        column) instead of always splitting the page width evenly -- a
+        short two-column table (e.g. "parameter"/"value") otherwise stretches
+        across the full page with a wide gap between short values. Capped at
+        what even division would give the column, so no single long column
+        can crowd the others out or push the table past the page width."""
+        equal_width = (self.w - 2 * self.l_margin) / len(header)
+        pad = 2 * self.c_margin + 2
+        col_widths = []
+        for col_idx, h in enumerate(header):
+            self.set_font('Helvetica', 'B', 8)
+            natural = self.get_string_width(str(h))
+            self.set_font('Helvetica', '', 8)
+            for row in rows:
+                natural = max(natural, self.get_string_width(str(row[col_idx])))
+            col_widths.append(min(equal_width, natural + pad))
+        return col_widths
+
     def add_table_page(self, title, header, rows):
         # Wide tables (many columns, e.g. DADA2 retention) get cramped in
         # portrait; landscape gives them roughly 40% more width.
@@ -85,16 +105,15 @@ class _ReportPDF(FPDF):
             self.set_font('Helvetica', '', 10)
             self.cell(0, 8, '(no data)', new_x='LMARGIN', new_y='NEXT')
             return
-        n_cols = len(header)
-        col_width = (self.w - 2 * self.l_margin) / n_cols
+        col_widths = self._column_widths(header, rows)
         self.set_font('Helvetica', 'B', 8)
-        for h in header:
-            self.cell(col_width, 7, self._fit_cell_text(str(h), col_width), border=1)
+        for h, w in zip(header, col_widths):
+            self.cell(w, 7, self._fit_cell_text(str(h), w), border=1)
         self.ln()
         self.set_font('Helvetica', '', 8)
         for row in rows:
-            for value in row:
-                self.cell(col_width, 6, self._fit_cell_text(str(value), col_width), border=1)
+            for value, w in zip(row, col_widths):
+                self.cell(w, 6, self._fit_cell_text(str(value), w), border=1)
             self.ln()
 
     def add_keyvalue_page(self, title, rows, label_width=45):
@@ -206,8 +225,15 @@ def _dada2_summary_table(output_folder):
 
 def _alpha_boxplot_figure(alpha_results, report_column):
     metrics = sorted(alpha_results)
-    fig, axes = plt.subplots(1, len(metrics), figsize=(4 * len(metrics), 4), squeeze=False)
-    for ax, metric in zip(axes[0], metrics):
+    n = len(metrics)
+    # A near-square grid (2x2 for the usual 4 metrics) instead of a single
+    # wide row -- each subplot gets roughly 4x the area, since it now scales
+    # with both page dimensions instead of just getting squeezed narrower.
+    n_cols = math.ceil(math.sqrt(n)) if n else 1
+    n_rows = math.ceil(n / n_cols) if n else 1
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5 * n_cols, 4.5 * n_rows), squeeze=False)
+    flat_axes = axes.flatten()
+    for ax, metric in zip(flat_axes, metrics):
         groups = alpha_results[metric].get(report_column, {}).get('groups', {})
         labels = sorted(groups)
         data = [groups[label] for label in labels]
@@ -215,6 +241,8 @@ def _alpha_boxplot_figure(alpha_results, report_column):
             ax.boxplot(data, tick_labels=labels)
         ax.set_title(metric)
         ax.tick_params(axis='x', rotation=45)
+    for ax in flat_axes[n:]:
+        ax.set_visible(False)
     fig.suptitle(f'Alpha diversity by {report_column}')
     fig.tight_layout()
     return fig
@@ -238,17 +266,46 @@ def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_col
     return fig
 
 
+_MANY_SAMPLES_THRESHOLD = 10
+
+
+def _fit_width_mm(fig, max_height_mm=230, max_width_mm=180):
+    """The fpdf placement width (mm) that keeps `fig` at most `max_height_mm`
+    tall once placed on the page. add_figure_page's own default (width=180)
+    assumes a roughly landscape-shaped figure; a much taller one needs a
+    correspondingly narrower placement width or it runs off the page --
+    fpdf places images by width alone and scales height to match the
+    figure's own aspect ratio."""
+    fig_w_in, fig_h_in = fig.get_size_inches()
+    return min(max_width_mm, max_height_mm * fig_w_in / fig_h_in)
+
+
 def _genus_barplot_figure(genus_table):
-    fig, ax = plt.subplots(figsize=(max(6, 0.6 * len(genus_table.columns)), 5))
-    genus_table.T.plot(kind='bar', stacked=True, ax=ax, legend=True)
-    ax.set_ylabel('Relative abundance')
+    n_samples = len(genus_table.columns)
+    if n_samples > _MANY_SAMPLES_THRESHOLD:
+        # Horizontal bars (one row per sample) scale by adding figure
+        # height, not width -- vertical bars for this many samples squeeze
+        # every bar, and its sample label, down to an unreadable sliver.
+        fig, ax = plt.subplots(figsize=(8, min(24, max(6, 0.3 * n_samples))))
+        genus_table.T.plot(kind='barh', stacked=True, ax=ax, legend=True)
+        ax.set_xlabel('Relative abundance')
+        ax.invert_yaxis()  # first sample at the top, matching reading order
+    else:
+        fig, ax = plt.subplots(figsize=(max(6, 0.6 * n_samples), 5))
+        genus_table.T.plot(kind='bar', stacked=True, ax=ax, legend=True)
+        ax.set_ylabel('Relative abundance')
     ax.legend(fontsize=7, bbox_to_anchor=(1.02, 1), loc='upper left')
     fig.tight_layout()
     return fig
 
 
 def _rarefaction_figure(curves, metric):
-    fig, ax = plt.subplots(figsize=(6, 5))
+    # A one-line-per-sample legend easily runs to dozens of entries, which
+    # dwarfed the actual plot (squeezed into a small corner) when this used
+    # a single wide-and-short figure. Taller and narrower, plus a 2-column
+    # legend past the sample-count threshold above, fixes both at once.
+    many_samples = len(curves) > _MANY_SAMPLES_THRESHOLD
+    fig, ax = plt.subplots(figsize=(7, 11) if many_samples else (6, 5))
     for sample_id, points in curves.items():
         if points:
             ax.plot([p[0] for p in points], [p[1] for p in points], marker='o', markersize=3,
@@ -256,7 +313,8 @@ def _rarefaction_figure(curves, metric):
     ax.set_xlabel('Sequencing depth')
     ax.set_ylabel(metric)
     ax.set_title(f'Rarefaction curve ({metric})')
-    ax.legend(fontsize=7, bbox_to_anchor=(1.02, 1), loc='upper left')
+    ax.legend(fontsize=6 if many_samples else 7, ncol=2 if many_samples else 1,
+              bbox_to_anchor=(1.02, 1), loc='upper left')
     fig.tight_layout()
     return fig
 
@@ -330,7 +388,8 @@ def build_report(output_folder, metadata_file, report_column=None):
                             ['metric', 'metadata column', 'H', 'p-value'], rows)
 
         if report_column and any(report_column in by_column for by_column in alpha_results.values()):
-            pdf.add_figure_page('Alpha diversity by group', _alpha_boxplot_figure(alpha_results, report_column))
+            alpha_fig = _alpha_boxplot_figure(alpha_results, report_column)
+            pdf.add_figure_page('Alpha diversity by group', alpha_fig, width=_fit_width_mm(alpha_fig))
 
     # 4. Beta diversity: PCoA + PERMANOVA
     beta_rows = []
@@ -357,13 +416,15 @@ def build_report(output_folder, metadata_file, report_column=None):
     biom_taxo_path = output_folder / 'biom_table' / 'table-with-taxonomy.biom.tsv'
     if biom_taxo_path.exists():
         genus_table = report_data.build_genus_abundance_table(biom_taxo_path)
-        pdf.add_figure_page('Genus-level relative abundance', _genus_barplot_figure(genus_table))
+        genus_fig = _genus_barplot_figure(genus_table)
+        pdf.add_figure_page('Genus-level relative abundance', genus_fig, width=_fit_width_mm(genus_fig))
 
     # 6. Rarefaction curve
     rarefaction_qzv = output_folder / 'alpha-rarefaction.qzv'
     if rarefaction_qzv.exists():
         curves = report_data.parse_rarefaction_curve(rarefaction_qzv, 'observed_features')
-        pdf.add_figure_page('Rarefaction curve', _rarefaction_figure(curves, 'observed_features'))
+        rarefaction_fig = _rarefaction_figure(curves, 'observed_features')
+        pdf.add_figure_page('Rarefaction curve', rarefaction_fig, width=_fit_width_mm(rarefaction_fig))
 
     # 7. Sample classifier accuracy, if any
     classifier_rows = []

@@ -153,6 +153,130 @@ class TestFitCellText:
         assert pdf.get_string_width(fitted) <= 30 - 2 * pdf.c_margin
 
 
+class TestColumnWidths:
+    def test_short_content_does_not_fill_the_page(self):
+        """Regression test: add_table_page used to always split the full
+        page width evenly across columns, so a short two-column table (e.g.
+        "parameter"/"value") stretched edge to edge with a wide, pointless
+        gap between short values."""
+        pdf = report._ReportPDF()
+        pdf.add_page()
+        equal_width = (pdf.w - 2 * pdf.l_margin) / 2
+        widths = pdf._column_widths(['parameter', 'value'], [['max-ee', '4.0'], ['taxa', 'Fungi']])
+        assert all(w < equal_width for w in widths)
+
+    def test_column_width_never_exceeds_equal_division(self):
+        """A column with genuinely long content is capped at what equal
+        division across all columns would give it, so it can't crowd out
+        the others or push the table past the page width."""
+        pdf = report._ReportPDF()
+        pdf.add_page()
+        equal_width = (pdf.w - 2 * pdf.l_margin) / 2
+        widths = pdf._column_widths(
+            ['comparison', 'value'],
+            [['a very very very long value that would otherwise stretch this column '
+              'well past what an even two-column split would give it', '1.0']])
+        assert widths[0] == equal_width
+
+    def test_total_width_never_exceeds_available_page_width(self):
+        pdf = report._ReportPDF()
+        pdf.add_page()
+        available = pdf.w - 2 * pdf.l_margin
+        widths = pdf._column_widths(
+            ['a', 'b', 'c'],
+            [['short', 'a moderately long value here', 'x']])
+        assert sum(widths) <= available
+
+
+class TestFitWidthMm:
+    def test_landscape_figure_uses_default_width(self):
+        import matplotlib.pyplot as plt
+        fig, _ax = plt.subplots(figsize=(6, 5))
+        assert report._fit_width_mm(fig) == 180
+        plt.close(fig)
+
+    def test_tall_figure_is_narrowed_to_fit_one_page(self):
+        import matplotlib.pyplot as plt
+        fig, _ax = plt.subplots(figsize=(7, 11))
+        width = report._fit_width_mm(fig)
+        height = width * 11 / 7
+        assert width < 180
+        assert height <= 230
+        plt.close(fig)
+
+
+class TestGenusBarplotFigure:
+    def test_switches_to_horizontal_bars_past_the_sample_threshold(self):
+        import pandas as pd
+        many_samples = pd.DataFrame(
+            {f'sample{i}': [0.5, 0.5] for i in range(report._MANY_SAMPLES_THRESHOLD + 1)},
+            index=['Fusarium', 'Other'])
+        fig = report._genus_barplot_figure(many_samples)
+        ax = fig.axes[0]
+        assert ax.get_xlabel() == 'Relative abundance'  # horizontal: abundance is the x-axis
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+
+    def test_stays_vertical_at_or_below_the_sample_threshold(self):
+        import pandas as pd
+        few_samples = pd.DataFrame(
+            {f'sample{i}': [0.5, 0.5] for i in range(report._MANY_SAMPLES_THRESHOLD)},
+            index=['Fusarium', 'Other'])
+        fig = report._genus_barplot_figure(few_samples)
+        ax = fig.axes[0]
+        assert ax.get_ylabel() == 'Relative abundance'  # vertical: abundance is the y-axis
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+
+
+class TestRarefactionFigure:
+    def test_legend_splits_into_two_columns_past_the_sample_threshold(self):
+        curves = {f'sample{i}': [(0, 1), (100, 2)] for i in range(report._MANY_SAMPLES_THRESHOLD + 1)}
+        fig = report._rarefaction_figure(curves, 'observed_features')
+        legend = fig.axes[0].get_legend()
+        assert legend._ncols == 2
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+
+    def test_legend_stays_single_column_at_or_below_the_threshold(self):
+        curves = {f'sample{i}': [(0, 1), (100, 2)] for i in range(report._MANY_SAMPLES_THRESHOLD)}
+        fig = report._rarefaction_figure(curves, 'observed_features')
+        legend = fig.axes[0].get_legend()
+        assert legend._ncols == 1
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+
+
+class TestAlphaBoxplotFigure:
+    def test_four_metrics_form_a_2x2_grid_not_a_single_row(self):
+        alpha_results = {
+            metric: {'site': {'groups': {'siteA': [1, 2], 'siteB': [3, 4]}}}
+            for metric in ('faith_pd', 'observed_features', 'shannon', 'evenness')
+        }
+        fig = report._alpha_boxplot_figure(alpha_results, 'site')
+        visible_axes = [ax for ax in fig.axes if ax.get_visible()]
+        assert len(visible_axes) == 4
+        # A 2x2 grid means axes pair up on 2 distinct x-positions and 2
+        # distinct y-positions in figure coordinates, not 4 of each (a 1x4 row).
+        positions = [ax.get_position() for ax in visible_axes]
+        assert len({round(p.x0, 3) for p in positions}) == 2
+        assert len({round(p.y0, 3) for p in positions}) == 2
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+
+    def test_unused_grid_cells_are_hidden_not_left_as_blank_empty_axes(self):
+        alpha_results = {
+            metric: {'site': {'groups': {'siteA': [1, 2], 'siteB': [3, 4]}}}
+            for metric in ('faith_pd', 'observed_features', 'shannon')
+        }
+        fig = report._alpha_boxplot_figure(alpha_results, 'site')
+        visible_axes = [ax for ax in fig.axes if ax.get_visible()]
+        assert len(visible_axes) == 3
+        assert len(fig.axes) == 4  # 2x2 grid, one cell hidden
+        import matplotlib.pyplot as plt
+        plt.close(fig)
+
+
 _SAMPLE_RUN_METADATA = {
     'pipeline': {
         'qiime2_its_version': '0.2.0',
