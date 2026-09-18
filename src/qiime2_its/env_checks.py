@@ -13,7 +13,14 @@ def clamp_cpu(requested_cpu, available_cpu=None):
 
 
 def clamp_parallel(requested_parallel, cpu):
-    """Never run more parallel processes than there are CPUs (1 CPU per process minimum)."""
+    """Never run more parallel processes than there are CPUs (1 CPU per process
+    minimum), and never fewer than 1. Without the lower bound, a 0 or negative
+    value (e.g. "-p 0") reaches downstream code as-is: size_filter.py divides
+    cpu by it (ZeroDivisionError) or it's passed straight to
+    ThreadPoolExecutor(max_workers=...) (ValueError), both an opaque crash
+    instead of a clear message."""
+    if requested_parallel < 1:
+        return 1
     return min(requested_parallel, cpu)
 
 

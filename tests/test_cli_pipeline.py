@@ -156,3 +156,53 @@ class TestPipelineChecks:
 
         with pytest.raises(ValueError, match='siteC-rep3'):
             pipeline.checks()
+
+    def test_unpaired_sample_rejected_with_clear_message(self, mocker, tmp_path, monkeypatch):
+        """Regression test: a paired-end sample missing its R2 mate used to
+        go undetected here and crash later with a bare IndexError inside a
+        ThreadPoolExecutor worker (remove_empties_pe_parallel /
+        size_select_pe_parallel both index reads[1] with no length check)."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path, se=False, pe=True)
+        # _make_pipeline already appended one R1-only fastq for "sample" --
+        # paired mode with no R2 for it is exactly the broken case.
+
+        with pytest.raises(ValueError, match='sample'):
+            pipeline.checks()
+
+    def test_complete_pairs_are_not_rejected(self, mocker, tmp_path, monkeypatch):
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path, se=False, pe=True)
+        r2 = tmp_path / 'sample_bc_L001_R2_001.fastq.gz'
+        with gzip.open(r2, 'wt') as f:
+            f.write('@r1\nACGT\n+\nIIII\n')
+        pipeline.fastq_list.append(r2)
+
+        pipeline.checks()  # should not raise: every sample has both mates
+
+    def test_pairing_check_only_applies_in_paired_end_mode(self, mocker, tmp_path, monkeypatch):
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path)  # se=True (default), single R1-only fastq
+
+        pipeline.checks()  # should not raise: single-end mode doesn't require R2s
+
+
+class TestWriteRunMetadata:
+    def test_records_the_actual_active_env_not_the_declared_one(self, mocker, tmp_path, monkeypatch):
+        """Regression test: checks() already warns when -q/--qiime2 doesn't
+        match the real active environment, but _write_run_metadata() used to
+        record self.qiime2_env (the possibly-stale declared value) in
+        run_metadata.json regardless -- defeating the point of a
+        provenance/audit record."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2027.1')
+        pipeline = _make_pipeline(mocker, tmp_path, qiime2='rachis-qiime2-2026.7')
+        pipeline.checks()  # sets self.active_env
+
+        mocker.patch('qiime2_its.cli.pipeline.qiime_wrapper.qiime_info', return_value='')
+        mocker.patch('qiime2_its.cli.pipeline.size_filter.bbduk_version', return_value=None)
+        mocker.patch('qiime2_its.cli.pipeline.provenance.write_run_metadata')
+        build_metadata = mocker.patch('qiime2_its.cli.pipeline.provenance.build_run_metadata')
+
+        pipeline._write_run_metadata()
+
+        assert build_metadata.call_args.kwargs['conda_env'] == 'rachis-qiime2-2027.1'

@@ -288,7 +288,7 @@ class Pipeline:
             username=getpass.getuser(),
             hostname=socket.gethostname(),
             platform_string=platform.platform(),
-            conda_env=self.qiime2_env,
+            conda_env=self.active_env,
             qiime_info_text=qiime_wrapper.qiime_info(),
             bbduk_version_text=size_filter.bbduk_version(),
             input_folder=self.input_folder,
@@ -377,10 +377,27 @@ class Pipeline:
                 'DADA2 cannot process an empty sample -- remove it from the input folder and from '
                 'the metadata file before running.'.format(', '.join(empty_samples)))
 
-        active_env = env_checks.check_qiime2_env_active()
-        if self.qiime2_env != active_env:
+        if self.paired:
+            # parse_fastq_list only inserts a file at index 0 (R1) or 1 (R2),
+            # so a sample missing one mate silently produces a 1-element list
+            # instead of a 2-element pair here -- caught explicitly now, with
+            # a clear message, instead of an IndexError deep inside a
+            # ThreadPoolExecutor worker later (remove_empties_pe_parallel /
+            # size_select_pe_parallel, both of which index reads[1] blindly).
+            unpaired_samples = sorted(sample for sample, reads in
+                                       fastq_utils.parse_fastq_list(self.fastq_list).items() if len(reads) != 2)
+            if unpaired_samples:
+                raise ValueError(
+                    'The following sample(s) are missing an R1 or R2 mate file: {}. Paired-end mode '
+                    '("-pe") requires exactly two files per sample.'.format(', '.join(unpaired_samples)))
+
+        # Stashed on self (not just a local) so _write_run_metadata() records the
+        # environment the pipeline actually ran under, not self.qiime2_env's
+        # possibly-stale user-declared value -- the whole point of this check.
+        self.active_env = env_checks.check_qiime2_env_active()
+        if self.qiime2_env != self.active_env:
             print(f'Warning: -q/--qiime2 was "{self.qiime2_env}" but the active conda environment is '
-                  f'"{active_env}" -- continuing with the active environment.')
+                  f'"{self.active_env}" -- continuing with the active environment.')
 
         if self.its1 and self.its2:
             raise ValueError('You cannot choose both ITS1 and ITS2 for the same analysis.')

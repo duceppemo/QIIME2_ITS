@@ -23,6 +23,16 @@ class TestClampParallel:
     def test_parallel_within_cpu_unchanged(self):
         assert env_checks.clamp_parallel(2, cpu=4) == 2
 
+    def test_zero_clamped_to_one(self):
+        """Regression test: 0 used to pass straight through (min(0, cpu) ==
+        0), which downstream code divides by (ZeroDivisionError in
+        size_filter.py) or passes to ThreadPoolExecutor(max_workers=0)
+        (ValueError) -- both an opaque crash instead of a clear message."""
+        assert env_checks.clamp_parallel(0, cpu=4) == 1
+
+    def test_negative_clamped_to_one(self):
+        assert env_checks.clamp_parallel(-3, cpu=4) == 1
+
 
 class TestCheckQiime2EnvActive:
     def test_raises_when_no_env_active(self, monkeypatch):
