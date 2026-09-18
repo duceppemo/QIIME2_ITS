@@ -269,6 +269,41 @@ def build_genus_abundance_table(biom_tsv_path, top_n=10):
     return result
 
 
+def parse_fasta_sequence_lengths(fasta_path):
+    """Per-record sequence lengths from a plain-text FASTA export (e.g.
+    `qiime tools export`'s dna-sequences.fasta for rep-seqs.qza). Returns a
+    list of ints, one per record; each record's sequence may itself be
+    wrapped across several lines, so lines are accumulated between '>'
+    headers rather than assumed to be one sequence per line."""
+    lengths = []
+    length = 0
+    seen_header = False
+    with open(fasta_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith('>'):
+                if seen_header:
+                    lengths.append(length)
+                seen_header = True
+                length = 0
+            else:
+                length += len(line)
+    if seen_header:
+        lengths.append(length)
+    return lengths
+
+
+def parse_taxonomy_confidence(taxonomy_tsv_path):
+    """Per-feature classifier confidence scores from the exported, biom-
+    header-rewritten taxonomy.tsv (biom_utils.rewrite_taxonomy_header's
+    '#OTUID\\ttaxonomy\\tconfidence'). Returns a list of floats."""
+    df = pd.read_csv(taxonomy_tsv_path, sep='\t')
+    confidence_col = next(c for c in df.columns if c.strip().lower() == 'confidence')
+    return pd.to_numeric(df[confidence_col], errors='coerce').dropna().tolist()
+
+
 def parse_run_metadata(run_metadata_json_path):
     """Parse run_metadata.json (written by cli/pipeline.py via
     provenance.write_run_metadata()) into a plain dict, or None if it

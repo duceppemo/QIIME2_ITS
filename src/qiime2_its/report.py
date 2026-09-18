@@ -313,6 +313,17 @@ _INTRO_CLASSIFIER = (
     'most common class would achieve; an "accuracy ratio" above 1 means community composition '
     'carries real predictive signal for that column.'
 )
+_INTRO_SEQ_LENGTH = (
+    'Length distribution of the representative sequences (one per ASV) produced by DADA2. ITS regions '
+    'are naturally variable in length, but a distribution that is unexpectedly narrow, wide, or '
+    'off-target suggests the primer/extraction step included flanking regions it should not have, or '
+    'trimmed too aggressively.'
+)
+_INTRO_CONFIDENCE = (
+    'Classifier confidence score for each ASV\'s taxonomic assignment (1.0 is fully confident). A '
+    'distribution skewed toward low values suggests many ASVs are only weakly resolved by the '
+    'reference database used to train the classifier.'
+)
 
 
 def _run_info_rows(run_metadata):
@@ -462,8 +473,13 @@ def _genus_barplot_figure(genus_table):
     if n_samples > _MANY_SAMPLES_THRESHOLD:
         # Horizontal bars (one row per sample) scale by adding figure
         # height, not width -- vertical bars for this many samples squeeze
-        # every bar, and its sample label, down to an unreadable sliver.
-        fig, ax = plt.subplots(figsize=(8, min(24, max(6, 0.3 * n_samples))))
+        # every bar, and its sample label, down to an unreadable sliver. A
+        # wider figure (11in, up from 8in) also matters here: add_figure_page
+        # sizes its placement width off this figure's own aspect ratio
+        # (_fit_width_mm), and the previous 8:height ratio left the bars
+        # using well under the available page width once a real (>10-sample)
+        # run made the figure this tall.
+        fig, ax = plt.subplots(figsize=(11, min(24, max(6, 0.3 * n_samples))))
         genus_table.T.plot(kind='barh', stacked=True, ax=ax, legend=True, width=0.85, color=colors,
                            edgecolor='white', linewidth=0.4)
         ax.set_xlabel('Relative abundance', fontsize=12)
@@ -498,6 +514,27 @@ def _rarefaction_figure(curves, metric):
     ax.set_title(f'Rarefaction curve ({metric})')
     ax.legend(fontsize=8.5 if many_samples else 9, ncol=2 if many_samples else 1,
               bbox_to_anchor=(1.02, 1), loc='upper left', frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def _seq_length_histogram_figure(lengths):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.hist(lengths, bins='auto', color=_COLORBLIND_PALETTE[0], edgecolor='white', linewidth=0.4)
+    ax.set_xlabel('Sequence length (bp)')
+    ax.set_ylabel('Number of ASVs')
+    ax.set_title('Representative sequence length distribution')
+    fig.tight_layout()
+    return fig
+
+
+def _confidence_histogram_figure(confidences):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.hist(confidences, bins='auto', range=(0, 1), color=_COLORBLIND_PALETTE[1], edgecolor='white',
+             linewidth=0.4)
+    ax.set_xlabel('Classification confidence')
+    ax.set_ylabel('Number of ASVs')
+    ax.set_title('Taxonomic classification confidence distribution')
     fig.tight_layout()
     return fig
 
@@ -566,6 +603,14 @@ def build_report(output_folder, metadata_file, report_column=None):
         _df, header, rows = dada2
         pdf.add_table_page('DADA2 read retention', header, rows, intro=_INTRO_DADA2)
 
+    # 2b. Representative sequence length distribution
+    rep_seqs_fasta = output_folder / 'rep_seqs_export' / 'dna-sequences.fasta'
+    if rep_seqs_fasta.exists():
+        lengths = report_data.parse_fasta_sequence_lengths(rep_seqs_fasta)
+        if lengths:
+            seq_length_fig = _seq_length_histogram_figure(lengths)
+            pdf.add_figure_page('Sequence length distribution', seq_length_fig, intro=_INTRO_SEQ_LENGTH)
+
     # 3. Alpha diversity: group-significance p-values + boxplots
     alpha_results = {}
     for qzv_path in sorted(output_folder.glob('alpha-group-significance-*.qzv')):
@@ -615,6 +660,14 @@ def build_report(output_folder, metadata_file, report_column=None):
         genus_fig = _genus_barplot_figure(genus_table)
         pdf.add_figure_page('Genus-level relative abundance', genus_fig, width=_fit_width_mm(genus_fig),
                              intro=_INTRO_GENUS)
+
+    # 5b. Taxonomic classification confidence distribution
+    taxonomy_tsv_path = output_folder / 'biom_table' / 'taxonomy.tsv'
+    if taxonomy_tsv_path.exists():
+        confidences = report_data.parse_taxonomy_confidence(taxonomy_tsv_path)
+        if confidences:
+            confidence_fig = _confidence_histogram_figure(confidences)
+            pdf.add_figure_page('Classification confidence', confidence_fig, intro=_INTRO_CONFIDENCE)
 
     # 6. Rarefaction curve
     rarefaction_qzv = output_folder / 'alpha-rarefaction.qzv'

@@ -133,6 +133,9 @@ class Pipeline:
                                         self.output_folder / 'feature-frequencies.qza',
                                         self.output_folder / 'sample-frequencies.qza')
         qiime_wrapper.seq_summary(repseq_qza, self.output_folder / 'rep-seqs.qzv')
+        # Plain-text FASTA export, so the report can build a sequence-length
+        # histogram without parsing rep-seqs.qzv's internal layout.
+        qiime_wrapper.export(repseq_qza, self.output_folder / 'rep_seqs_export')
 
         print('Aligning representative sequences and building phylogenetic tree...')
         aligned_qza = self.output_folder / 'aligned-rep-seqs.qza'

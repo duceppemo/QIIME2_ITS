@@ -262,6 +262,24 @@ class TestRarefactionFigure:
         plt.close(fig)
 
 
+class TestSeqLengthHistogramFigure:
+    def test_builds_a_figure_with_one_axes(self):
+        import matplotlib.pyplot as plt
+        fig = report._seq_length_histogram_figure([200, 210, 205, 198, 300])
+        assert len(fig.axes) == 1
+        assert fig.axes[0].get_xlabel() == 'Sequence length (bp)'
+        plt.close(fig)
+
+
+class TestConfidenceHistogramFigure:
+    def test_builds_a_figure_with_one_axes(self):
+        import matplotlib.pyplot as plt
+        fig = report._confidence_histogram_figure([0.9, 0.95, 1.0, 0.6])
+        assert len(fig.axes) == 1
+        assert fig.axes[0].get_xlabel() == 'Classification confidence'
+        plt.close(fig)
+
+
 class TestAlphaBoxplotFigure:
     def test_four_metrics_form_a_2x2_grid_not_a_single_row(self):
         alpha_results = {

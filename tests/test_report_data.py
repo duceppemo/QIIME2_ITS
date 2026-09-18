@@ -257,3 +257,34 @@ class TestParseRunMetadata:
 
     def test_returns_none_when_missing(self, tmp_path):
         assert report_data.parse_run_metadata(tmp_path / 'does-not-exist.json') is None
+
+
+class TestParseFastaSequenceLengths:
+    def test_parses_single_line_sequences(self, tmp_path):
+        path = tmp_path / 'dna-sequences.fasta'
+        path.write_text('>seq1\nACGTACGT\n>seq2\nACGT\n')
+        assert report_data.parse_fasta_sequence_lengths(path) == [8, 4]
+
+    def test_sums_a_sequence_wrapped_across_multiple_lines(self, tmp_path):
+        """A record's sequence isn't guaranteed to be a single line -- some
+        FASTA writers wrap at a fixed width -- so lines must be accumulated
+        between headers rather than assumed to be one sequence per line."""
+        path = tmp_path / 'dna-sequences.fasta'
+        path.write_text('>seq1\nACGT\nACGT\n>seq2\nAC\n')
+        assert report_data.parse_fasta_sequence_lengths(path) == [8, 2]
+
+    def test_empty_file_returns_empty_list(self, tmp_path):
+        path = tmp_path / 'dna-sequences.fasta'
+        path.write_text('')
+        assert report_data.parse_fasta_sequence_lengths(path) == []
+
+
+class TestParseTaxonomyConfidence:
+    def test_parses_confidence_column(self, tmp_path):
+        path = tmp_path / 'taxonomy.tsv'
+        path.write_text(
+            '#OTUID\ttaxonomy\tconfidence\n'
+            'f1\tk__Fungi;p__Ascomycota\t0.999\n'
+            'f2\tk__Fungi\t1.0\n'
+        )
+        assert report_data.parse_taxonomy_confidence(path) == [0.999, 1.0]
