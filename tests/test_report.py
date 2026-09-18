@@ -421,6 +421,28 @@ class TestAlphaBoxplotFigure:
         import matplotlib.pyplot as plt
         plt.close(fig)
 
+    def test_many_groups_rotate_labels_fully_vertical(self):
+        """Regression test: 45-degree labels' horizontal footprint grows
+        with label length, so a column with many (real example: 14)
+        categories crowded adjacent rotated labels into each other and made
+        them unreadable in a real generated report. Fully vertical labels
+        take the same small footprint regardless of label length."""
+        import matplotlib.pyplot as plt
+        groups = {f'group{i}': [1, 2] for i in range(report._MANY_SAMPLES_THRESHOLD + 1)}
+        alpha_results = {'shannon': {'site': {'groups': groups}}}
+        fig = report._alpha_boxplot_figure(alpha_results, 'site')
+        ax = [a for a in fig.axes if a.get_visible()][0]
+        assert ax.xaxis.get_ticklabels()[0].get_rotation() == 90
+        plt.close(fig)
+
+    def test_few_groups_keep_the_45_degree_rotation(self):
+        import matplotlib.pyplot as plt
+        alpha_results = {'shannon': {'site': {'groups': {'siteA': [1, 2], 'siteB': [3, 4]}}}}
+        fig = report._alpha_boxplot_figure(alpha_results, 'site')
+        ax = [a for a in fig.axes if a.get_visible()][0]
+        assert ax.xaxis.get_ticklabels()[0].get_rotation() == 45
+        plt.close(fig)
+
 
 _SAMPLE_RUN_METADATA = {
     'pipeline': {

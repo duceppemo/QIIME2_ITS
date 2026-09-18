@@ -422,6 +422,14 @@ def _alpha_boxplot_figure(alpha_results, report_column):
     n_rows = math.ceil(n / n_cols) if n else 1
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5 * n_cols, 4.5 * n_rows), squeeze=False)
     flat_axes = axes.flatten()
+    n_groups = max((len(alpha_results[m].get(report_column, {}).get('groups', {})) for m in metrics), default=0)
+    # 45-degree labels' horizontal footprint grows with label length -- fine
+    # for a handful of short categories, but a column with many (and often
+    # long, e.g. env-local-scale's "self-heating coal mine waste material")
+    # category names crowds adjacent labels into each other. Fully vertical
+    # labels take the same small, length-independent horizontal footprint
+    # regardless of how long the label text is.
+    rotation = 90 if n_groups > _MANY_SAMPLES_THRESHOLD else 45
     for ax, metric in zip(flat_axes, metrics):
         groups = alpha_results[metric].get(report_column, {}).get('groups', {})
         labels = sorted(groups)
@@ -432,7 +440,7 @@ def _alpha_boxplot_figure(alpha_results, report_column):
                 patch.set_facecolor(_COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)])
                 patch.set_alpha(0.75)
         ax.set_title(metric)
-        ax.tick_params(axis='x', rotation=45)
+        ax.tick_params(axis='x', rotation=rotation)
     for ax in flat_axes[n:]:
         ax.set_visible(False)
     fig.suptitle(f'Alpha diversity by {report_column}', fontsize=13)
