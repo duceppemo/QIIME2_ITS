@@ -11,7 +11,7 @@ def mock_env_check(mocker):
 
 
 @pytest.fixture
-def mock_pipeline(mocker, tmp_path):
+def mock_pipeline(mocker):
     """Mocks every external call run() makes, so it can be exercised end to
     end without hitting NCBI, the real taxdump, or a real QIIME2 install."""
     mocker.patch('qiime2_its.cli.train_ncbi.downloader.download')

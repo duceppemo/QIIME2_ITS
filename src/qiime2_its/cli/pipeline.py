@@ -5,6 +5,7 @@ filter -> DADA2 denoise -> phylogeny -> diversity -> taxonomy -> barplot ->
 import argparse
 import getpass
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -15,6 +16,19 @@ from qiime2_its import (biom_utils, env_checks, fastq_utils, itsxpress_wrapper, 
                          qiime_wrapper, report, report_data, size_filter, taxonomy)
 from qiime2_its._version import __version__
 from qiime2_its.itsxpress_wrapper import TAXA_CODES
+
+
+def _safe_filename_component(text):
+    """Replace characters outside [A-Za-z0-9._-] with '_' for safe use as a
+    filesystem path component. QIIME2 doesn't restrict metadata column names
+    from containing '/' (or other characters with filesystem meaning), and
+    this pipeline builds output paths directly from the column name -- a
+    column like "site/plot" would otherwise be interpreted as a
+    subdirectory, and QIIME2's own writers don't create missing parent
+    directories for a single-artifact output, so it fails outright (a
+    crash, not silently writing outside the output folder, but a fragile
+    invariant to depend on regardless)."""
+    return re.sub(r'[^A-Za-z0-9._-]', '_', text)
 
 
 class Pipeline:
@@ -226,12 +240,13 @@ class Pipeline:
 
         print('Testing beta diversity group significance...')
         for column in eligible_columns:
+            safe_column = _safe_filename_component(column)
             for metric in ('bray_curtis', 'unweighted_unifrac'):
                 distance_qza = core_metrics_dir / f'{metric}_distance_matrix.qza'
                 if distance_qza.exists():
                     qiime_wrapper.beta_group_significance(
-                        distance_qza, self.metadata_file, column,
-                        self.output_folder / f'beta-group-significance-{column}-{metric}.qzv')
+                        distance_qza, self.metadata_file, column,  # raw column name -- must match the metadata file
+                        self.output_folder / f'beta-group-significance-{safe_column}-{metric}.qzv')
 
         print('Exporting PCoA ordinations and distance matrices...')
         for metric in ('bray_curtis', 'unweighted_unifrac'):
@@ -263,7 +278,7 @@ class Pipeline:
             if smallest_class < 2:
                 print(f'\tSkipping classifier for "{column}": at least one class has fewer than 2 samples.')
                 continue
-            classifier_dir = self.output_folder / f'sample-classifier-{column}'
+            classifier_dir = self.output_folder / f'sample-classifier-{_safe_filename_component(column)}'
             try:
                 qiime_wrapper.classify_samples(table_qza, self.metadata_file, column, classifier_dir,
                                                 cv=min(5, smallest_class))
@@ -405,6 +420,16 @@ class Pipeline:
             env_checks.check_executable(
                 'bbduk.sh', 'Install BBTools/BBMap into your QIIME2 environment, e.g. '
                             '"conda install -c bioconda -c conda-forge bbmap".')
+            # BBDuk parses its own arguments as key=value pairs (in=..., out=...,
+            # minlength=...) -- confirmed empirically: a path containing "="
+            # anywhere (output folder or fastq filename) truncates that argument
+            # at the "=" and BBDuk fails with a cryptic "Can't read file" error
+            # deep inside a ThreadPoolExecutor worker, instead of a clear message.
+            bad_paths = sorted({str(p) for p in (self.output_folder, *self.fastq_list) if '=' in str(p)})
+            if bad_paths:
+                raise ValueError(
+                    'BBDuk (used for --min-len/--max-len) parses its own arguments as key=value pairs, '
+                    'so a path containing "=" breaks it -- rename or move: {}'.format(', '.join(bad_paths)))
 
 
 def build_parser():

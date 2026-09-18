@@ -180,7 +180,7 @@ class TestRcFastq:
         assert seq == 'CGTT'
         assert qual == 'JJII'
 
-    def test_raises_on_malformed_header(self, tmp_path, write_fastq):
+    def test_raises_on_malformed_header(self, tmp_path):
         src = tmp_path / 'bad_bc_L001_R1_001.fastq'
         src.write_text('not-a-header\nACGT\n+\nIIII\n')
         with pytest.raises(ValueError):

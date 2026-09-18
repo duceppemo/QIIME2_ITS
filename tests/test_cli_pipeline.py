@@ -2,7 +2,7 @@ import gzip
 
 import pytest
 
-from qiime2_its.cli.pipeline import Pipeline, build_parser
+from qiime2_its.cli.pipeline import Pipeline, _safe_filename_component, build_parser
 
 REQUIRED = ['-q', 'rachis-qiime2-2026.7', '-i', 'in/', '-o', 'out/', '-m', 'meta.tsv', '-c', 'clf.qza']
 
@@ -19,7 +19,7 @@ def test_se_and_pe_are_mutually_exclusive():
         parser.parse_args(REQUIRED + ['-se', '-pe'])
 
 
-def test_se_alone_parses(capsys):
+def test_se_alone_parses():
     parser = build_parser()
     args = parser.parse_args(REQUIRED + ['-se'])
     assert args.se is True
@@ -102,6 +102,23 @@ def _make_pipeline(mocker, tmp_path, **overrides):
     return pipeline
 
 
+class TestSafeFilenameComponent:
+    def test_leaves_ordinary_column_names_unchanged(self):
+        assert _safe_filename_component('host-plant') == 'host-plant'
+
+    def test_replaces_path_separators(self):
+        """Regression test: QIIME2 doesn't restrict metadata column names
+        from containing '/' (e.g. a real column named "site/plot"), and
+        _run_advanced_stats builds output paths directly from the column
+        name -- unsanitized, '/' would be interpreted as a subdirectory
+        separator instead of a literal character in the filename."""
+        assert _safe_filename_component('site/plot') == 'site_plot'
+        assert _safe_filename_component('../../etc/passwd') == '.._.._etc_passwd'
+
+    def test_replaces_other_filesystem_significant_characters(self):
+        assert _safe_filename_component('treatment (mg/L)') == 'treatment__mg_L_'
+
+
 class TestPipelineChecks:
     def test_min_len_requires_bbduk_on_path(self, mocker, tmp_path, monkeypatch):
         """Regression test: --min-len/--max-len depend on bbduk.sh, which the
@@ -112,6 +129,20 @@ class TestPipelineChecks:
         pipeline = _make_pipeline(mocker, tmp_path, min_len=100)
 
         with pytest.raises(EnvironmentError, match='bbduk.sh'):
+            pipeline.checks()
+
+    def test_min_len_rejects_an_equals_sign_in_the_output_path(self, mocker, tmp_path, monkeypatch):
+        """Regression test: BBDuk parses its own arguments as key=value
+        pairs -- confirmed empirically against the real bbduk.sh (39.80) --
+        so an output path containing "=" (e.g. a date-stamped folder like
+        "run=2026-09-18") truncates the out= argument at the "=" and BBDuk
+        dies with a cryptic "Can't read file" error deep inside a
+        ThreadPoolExecutor worker instead of a clear message here."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        mocker.patch('qiime2_its.env_checks.shutil.which', return_value='/usr/bin/bbduk.sh')
+        pipeline = _make_pipeline(mocker, tmp_path, min_len=100, output=str(tmp_path / 'run=2' / 'out'))
+
+        with pytest.raises(ValueError, match='run=2'):
             pipeline.checks()
 
     def test_no_bbduk_check_when_no_size_filtering_requested(self, mocker, tmp_path, monkeypatch):
