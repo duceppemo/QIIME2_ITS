@@ -73,12 +73,18 @@ def validate_casava_filenames(fastq_list):
     """
     for fq in fastq_list:
         name = Path(fq).name
-        parts = name.split('.')
-        ext = parts[-2] if name.endswith('.gz') else parts[-1]
-        if ext != 'fastq':
+        if name.endswith('.fastq.gz'):
+            stem = name[:-len('.fastq.gz')]
+        elif name.endswith('.fastq'):
+            stem = name[:-len('.fastq')]
+        else:
             raise ValueError(CASAVA_NAMING_ERROR)
 
-        fields = parts[0].split('_')
+        # Split only the trailing .fastq[.gz] off first -- real-world sample
+        # identifiers (e.g. SRA-derived ones like "K.BeL.1.1") can themselves
+        # contain dots, which a naive name.split('.')[0] would mistake for
+        # the start of the extension and truncate the sample identifier.
+        fields = stem.split('_')
         if len(fields) != 5 or not fields[2].startswith('L') or fields[3] not in ('R1', 'R2') \
                 or fields[4] != '001':
             raise ValueError(CASAVA_NAMING_ERROR)

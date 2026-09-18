@@ -81,6 +81,16 @@ class TestValidateCasavaFilenames:
         underscore-delimited field count."""
         fastq_utils.validate_casava_filenames(['siteA-rep1_S1_L001_R1_001.fastq.gz'])  # no raise
 
+    def test_dot_in_sample_identifier_is_accepted(self):
+        """Regression test: real SRA-derived sample identifiers (e.g. this
+        one, taken from PRJNA767765) commonly contain dots. The old
+        implementation split the whole filename on '.' to find the
+        extension, which mistook the first dot in the sample identifier for
+        the start of the extension and truncated it -- 'K.BeL.1.1_S1_L001_
+        R1_001.fastq.gz' become stem 'K' (1 field, not 5) and was rejected
+        as invalid even though it's a perfectly valid Casava name."""
+        fastq_utils.validate_casava_filenames(['K.BeL.1.1_S1_L001_R1_001.fastq.gz'])  # no raise
+
 
 class TestStripNonFastqFiles:
     def test_removes_manifest_and_metadata_keeps_fastq(self, tmp_path):
