@@ -5,6 +5,16 @@ import pytest
 from qiime2_its import fastq_utils
 
 
+def _gzip_xfl(path):
+    """The gzip header's XFL byte (RFC 1952): zlib writes 2 for its slowest,
+    maximum-compression level 9, 4 for fastest (level 1), 0 otherwise -- so a
+    written file records whether it came out of gzip.open()'s default level 9."""
+    return path.read_bytes()[8]
+
+
+_GZIP_MAX_COMPRESSION_XFL = 2
+
+
 class TestIsEmptyFastq:
     def test_true_for_zero_read_gzipped_file(self, tmp_path):
         fq = tmp_path / 'empty.fastq.gz'
@@ -134,6 +144,21 @@ class TestRemoveEmptiesSe:
         assert stats == (1, 1, 0)
         assert fq.read_text().startswith('@read1')
 
+    def test_does_not_rewrite_at_gzip_maximum_compression(self, tmp_path, write_fastq):
+        """Regression test: gzip.open()'s default compresslevel=9 was ~98% of
+        this function's runtime on a real 150k-read Illumina file (35s
+        end-to-end, vs 1.9s at fastq_utils.GZIP_COMPRESS_LEVEL=4) for a ~10%
+        smaller intermediate that `qiime tools import` reads exactly once.
+        The fixture writes the input at the default level 9 (XFL=2), so the
+        rewrite must come out at something else."""
+        fq = tmp_path / 'sample_bc_L001_R1_001.fastq.gz'
+        write_fastq(fq, [('@read1', 'ACGT', 'IIII')], gz=True)
+        assert _gzip_xfl(fq) == _GZIP_MAX_COMPRESSION_XFL  # precondition: input is level 9
+
+        fastq_utils.remove_empties_se(fq)
+
+        assert _gzip_xfl(fq) != _GZIP_MAX_COMPRESSION_XFL
+
 
 class TestRemoveEmptiesPe:
     def test_drops_pair_if_either_mate_empty(self, tmp_path, write_fastq):
@@ -150,6 +175,19 @@ class TestRemoveEmptiesPe:
         with gzip.open(r2, 'rt') as f:
             r2_headers = [r[0] for r in fastq_utils.iter_fastq_records(f)]
         assert r1_headers == r2_headers == ['@a']
+
+    def test_does_not_rewrite_either_mate_at_gzip_maximum_compression(self, tmp_path, write_fastq):
+        """Same as the single-end regression test, for both mates."""
+        r1 = tmp_path / 'sample_bc_L001_R1_001.fastq.gz'
+        r2 = tmp_path / 'sample_bc_L001_R2_001.fastq.gz'
+        write_fastq(r1, [('@a', 'ACGT', 'IIII')], gz=True)
+        write_fastq(r2, [('@a', 'TTTT', 'IIII')], gz=True)
+        assert _gzip_xfl(r1) == _gzip_xfl(r2) == _GZIP_MAX_COMPRESSION_XFL
+
+        fastq_utils.remove_empties_pe(r1, r2)
+
+        assert _gzip_xfl(r1) != _GZIP_MAX_COMPRESSION_XFL
+        assert _gzip_xfl(r2) != _GZIP_MAX_COMPRESSION_XFL
 
 
 class TestReverseComplement:
@@ -185,3 +223,68 @@ class TestRcFastq:
         src.write_text('not-a-header\nACGT\n+\nIIII\n')
         with pytest.raises(ValueError):
             fastq_utils.rc_fastq(src, tmp_path)
+
+    def test_does_not_write_at_gzip_maximum_compression(self, tmp_path, write_fastq):
+        """Same regression as TestRemoveEmptiesSe's: rc_fastq() on a real
+        150k-read Illumina file took 36.5s end-to-end at gzip.open()'s default
+        level 9, of which ~0.5s was reading/reverse-complementing."""
+        src = tmp_path / 'sample_bc_L001_R1_001.fastq'
+        write_fastq(src, [('@r1', 'AACG', 'IIJJ')], gz=False)
+        out_dir = tmp_path / 'out'
+        out_dir.mkdir()
+
+        out_path = fastq_utils.rc_fastq(src, out_dir)
+
+        assert _gzip_xfl(out_path) != _GZIP_MAX_COMPRESSION_XFL
+
+
+class TestRcFastqParallel:
+    def test_reverse_complements_every_file(self, tmp_path, write_fastq):
+        a = tmp_path / 'a_bc_L001_R1_001.fastq'
+        b = tmp_path / 'b_bc_L001_R1_001.fastq.gz'
+        write_fastq(a, [('@a', 'AACG', 'IIJJ')], gz=False)
+        write_fastq(b, [('@b', 'TTTA', 'IIJJ')], gz=True)
+        out_dir = tmp_path / 'out'
+        out_dir.mkdir()
+
+        fastq_utils.rc_fastq_parallel([a, b], out_dir, parallel=2)
+
+        assert sorted(p.name for p in out_dir.iterdir()) == ['a_bc_L001_R1_001.fastq.gz',
+                                                             'b_bc_L001_R1_001.fastq.gz']
+        with gzip.open(out_dir / 'b_bc_L001_R1_001.fastq.gz', 'rt') as f:
+            assert next(fastq_utils.iter_fastq_records(f))[1] == 'TAAA'
+
+    def test_rejects_same_named_inputs_from_different_subfolders(self, tmp_path, write_fastq):
+        """list_fastq() searches recursively, but every output lands flat in
+        output_dir under its input's basename -- so two same-named inputs
+        from different subfolders would be reverse-complemented into the
+        *same* output file by two worker threads at once, each truncating
+        and overwriting the other's bytes into a corrupt gzip stream that
+        holds neither file's reads. Must be refused before any worker
+        starts, not discovered as a garbled file at import time."""
+        name = 'sample_bc_L001_R1_001.fastq'
+        a = tmp_path / 'run1' / name
+        b = tmp_path / 'run2' / name
+        a.parent.mkdir()
+        b.parent.mkdir()
+        write_fastq(a, [('@a', 'AACG', 'IIJJ')], gz=False)
+        write_fastq(b, [('@b', 'TTTA', 'IIJJ')], gz=False)
+        out_dir = tmp_path / 'out'
+        out_dir.mkdir()
+
+        with pytest.raises(ValueError, match='sample_bc_L001_R1_001.fastq.gz'):
+            fastq_utils.rc_fastq_parallel([a, b], out_dir, parallel=2)
+
+        assert list(out_dir.iterdir()) == []  # refused up front, nothing written
+
+    def test_rejects_plain_and_gzipped_copies_of_the_same_name(self, tmp_path, write_fastq):
+        """a.fastq and a.fastq.gz both map to the output name a.fastq.gz."""
+        a = tmp_path / 'sample_bc_L001_R1_001.fastq'
+        a_gz = tmp_path / 'sample_bc_L001_R1_001.fastq.gz'
+        write_fastq(a, [('@a', 'AACG', 'IIJJ')], gz=False)
+        write_fastq(a_gz, [('@a', 'AACG', 'IIJJ')], gz=True)
+        out_dir = tmp_path / 'out'
+        out_dir.mkdir()
+
+        with pytest.raises(ValueError):
+            fastq_utils.rc_fastq_parallel([a, a_gz], out_dir, parallel=2)

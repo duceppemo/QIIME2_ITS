@@ -42,14 +42,7 @@ def read_metadata_rows(path):
     return header, types_row, data_rows
 
 
-def parse_metadata_columns(path):
-    """Return {column_name: 'categorical'|'numeric'} for every non-id column.
-
-    Honors an explicit `#q2:types` directive if present; otherwise infers a
-    column as numeric only if every non-missing value in it parses as a
-    float, matching QIIME2's own type-inference rule.
-    """
-    header, types_row, data_rows = read_metadata_rows(path)
+def _column_types(header, types_row, data_rows):
     columns = header[1:]
 
     if types_row is not None:
@@ -63,21 +56,52 @@ def parse_metadata_columns(path):
     return result
 
 
-def read_metadata_table(path):
-    """Return {sample_id: {column: value}}."""
-    header, _types_row, data_rows = read_metadata_rows(path)
+def parse_metadata_columns(path):
+    """Return {column_name: 'categorical'|'numeric'} for every non-id column.
+
+    Honors an explicit `#q2:types` directive if present; otherwise infers a
+    column as numeric only if every non-missing value in it parses as a
+    float, matching QIIME2's own type-inference rule.
+    """
+    return _column_types(*read_metadata_rows(path))
+
+
+def _table(header, data_rows):
     columns = header[1:]
     return {row[0]: dict(zip(columns, row[1:])) for row in data_rows}
 
 
-def class_sizes(path, column, sample_ids):
-    """{value: count} for `column`, restricted to `sample_ids`."""
-    table = read_metadata_table(path)
+def read_metadata_table(path):
+    """Return {sample_id: {column: value}}."""
+    header, _types_row, data_rows = read_metadata_rows(path)
+    return _table(header, data_rows)
+
+
+def _class_sizes(table, column, sample_ids):
     counts = defaultdict(int)
     for sample_id in sample_ids:
         if sample_id in table:
             counts[table[sample_id].get(column, '')] += 1
     return dict(counts)
+
+
+def class_sizes(path, column, sample_ids):
+    """{value: count} for `column`, restricted to `sample_ids`."""
+    return _class_sizes(read_metadata_table(path), column, sample_ids)
+
+
+def _categorical_class_sizes(path, sample_ids):
+    """Yield (column, {value: count}) for every categorical column, in file
+    order, from a single read of `path` -- eligible_categorical_columns()
+    and has_alpha_group_significance_column() previously re-read and
+    re-parsed the whole file once per categorical column (via class_sizes()
+    -> read_metadata_table()) on top of parse_metadata_columns()'s own read.
+    """
+    header, types_row, data_rows = read_metadata_rows(path)
+    table = _table(header, data_rows)
+    for col, col_type in _column_types(header, types_row, data_rows).items():
+        if col_type == 'categorical':
+            yield col, _class_sizes(table, col, sample_ids)
 
 
 def final_sample_ids(sample_frequencies, fallback_sample_ids):
@@ -105,12 +129,8 @@ def eligible_categorical_columns(path, sample_ids, min_per_group=2):
     `min_per_group` of the given `sample_ids`. Preserves metadata-file column
     order.
     """
-    column_types = parse_metadata_columns(path)
     eligible = []
-    for col, col_type in column_types.items():
-        if col_type != 'categorical':
-            continue
-        counts = class_sizes(path, col, sample_ids)
+    for col, counts in _categorical_class_sizes(path, sample_ids):
         groups = [n for n in counts.values() if n >= min_per_group]
         if len(groups) >= 2:
             eligible.append(col)
@@ -128,11 +148,5 @@ def has_alpha_group_significance_column(path, sample_ids):
     2+ distinct values with at least one repeated (not every value unique,
     which reads as an ID column) and not every sample sharing one value.
     """
-    column_types = parse_metadata_columns(path)
-    for col, col_type in column_types.items():
-        if col_type != 'categorical':
-            continue
-        counts = class_sizes(path, col, sample_ids)
-        if len(counts) >= 2 and any(n >= 2 for n in counts.values()):
-            return True
-    return False
+    return any(len(counts) >= 2 and any(n >= 2 for n in counts.values())
+               for _col, counts in _categorical_class_sizes(path, sample_ids))

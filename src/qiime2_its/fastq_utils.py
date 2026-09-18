@@ -5,11 +5,22 @@ unit-testable without QIIME2/ITSxpress/BBTools installed.
 """
 import gzip
 import os
-from collections import defaultdict, namedtuple
+from collections import Counter, defaultdict, namedtuple
 from concurrent import futures
 from pathlib import Path
 
 FASTQ_EXTENSIONS = ('.fastq', '.fastq.gz', '.fq', '.fq.gz')
+
+# gzip.open()'s default compresslevel is 9. Measured on a real 150k-read
+# Illumina fastq (77 MB uncompressed): level 9 took 35s to write vs 9.5s at
+# level 6 (gzip(1)'s default) and 1.9s at level 4, for 23.5 / 24.3 / 25.9 MB
+# outputs -- and reading+parsing the same file takes 0.5s, so at level 9
+# remove_empties_se()/rc_fastq() spent ~98% of their time in zlib. Every
+# file written here is either a pipeline intermediate `qiime tools import`
+# reads exactly once (exported_reads/, rc_reads/) or the standalone fastq-rc
+# tool's output, so a ~10% smaller file isn't worth ~18x the write time. 4 is
+# also bcl2fastq's own default for the fastq files it writes.
+GZIP_COMPRESS_LEVEL = 4
 
 CleanStats = namedtuple('CleanStats', ['total', 'kept', 'empty'])
 
@@ -90,10 +101,20 @@ def validate_casava_filenames(fastq_list):
             raise ValueError(CASAVA_NAMING_ERROR)
 
 
-def _open_fastq(path, mode='rt'):
-    """Open a fastq file for text read/write, transparently gzip-aware."""
-    opener = gzip.open if str(path).endswith('.gz') else open
-    return opener(path, mode)
+def _open_fastq(path, mode='rt', gz=None):
+    """Open a fastq file for text read/write, transparently gzip-aware.
+
+    `gz` overrides the by-extension detection, for a temp file whose own name
+    doesn't end in .gz but must use its final destination's compression
+    (remove_empties_se/pe's `.clean` files). Writes use GZIP_COMPRESS_LEVEL.
+    """
+    if gz is None:
+        gz = str(path).endswith('.gz')
+    if not gz:
+        return open(path, mode)
+    if 'w' in mode:
+        return gzip.open(path, mode, compresslevel=GZIP_COMPRESS_LEVEL)
+    return gzip.open(path, mode)
 
 
 def is_empty_fastq(path):
@@ -130,10 +151,10 @@ def remove_empties_se(fastq_path):
     tmp_path = fastq_path.with_name(fastq_path.name + '.clean')
     # tmp_path's own name doesn't end in .gz, so pick the (de)compressor from
     # the real fastq_path for both sides instead of letting _open_fastq guess.
-    opener = gzip.open if fastq_path.name.endswith('.gz') else open
+    gz = fastq_path.name.endswith('.gz')
 
     total = kept = empty = 0
-    with opener(fastq_path, 'rt') as in_f, opener(tmp_path, 'wt') as out_f:
+    with _open_fastq(fastq_path, 'rt', gz=gz) as in_f, _open_fastq(tmp_path, 'wt', gz=gz) as out_f:
         for header, sequence, plus, quality in iter_fastq_records(in_f):
             total += 1
             if sequence == '':
@@ -152,12 +173,12 @@ def remove_empties_pe(r1_path, r2_path):
     r1_path, r2_path = Path(r1_path), Path(r2_path)
     tmp_r1 = r1_path.with_name(r1_path.name + '.clean')
     tmp_r2 = r2_path.with_name(r2_path.name + '.clean')
-    opener_r1 = gzip.open if r1_path.name.endswith('.gz') else open
-    opener_r2 = gzip.open if r2_path.name.endswith('.gz') else open
+    gz_r1 = r1_path.name.endswith('.gz')
+    gz_r2 = r2_path.name.endswith('.gz')
 
     total = kept = empty = 0
-    with opener_r1(r1_path, 'rt') as in_r1, opener_r2(r2_path, 'rt') as in_r2, \
-            opener_r1(tmp_r1, 'wt') as out_r1, opener_r2(tmp_r2, 'wt') as out_r2:
+    with _open_fastq(r1_path, 'rt', gz=gz_r1) as in_r1, _open_fastq(r2_path, 'rt', gz=gz_r2) as in_r2, \
+            _open_fastq(tmp_r1, 'wt', gz=gz_r1) as out_r1, _open_fastq(tmp_r2, 'wt', gz=gz_r2) as out_r2:
         for (h1, s1, p1, q1), (h2, s2, p2, q2) in zip(iter_fastq_records(in_r1), iter_fastq_records(in_r2)):
             total += 1
             if s1 == '' or s2 == '':
@@ -188,15 +209,20 @@ def reverse_complement(sequence):
     return sequence.translate(_COMPLEMENT_TABLE)[::-1]
 
 
+def _rc_output_path(fastq_path, output_dir):
+    """Where rc_fastq() writes `fastq_path`'s copy: flat in `output_dir`, gzipped."""
+    fastq_path = Path(fastq_path)
+    out_name = fastq_path.name if fastq_path.name.endswith('.gz') else fastq_path.name + '.gz'
+    return Path(output_dir) / out_name
+
+
 def rc_fastq(fastq_path, output_dir):
     """Write a reverse-complemented, gzip-compressed copy of `fastq_path` into `output_dir`."""
     fastq_path = Path(fastq_path)
-    output_dir = Path(output_dir)
-    out_name = fastq_path.name if fastq_path.name.endswith('.gz') else fastq_path.name + '.gz'
-    out_path = output_dir / out_name
+    out_path = _rc_output_path(fastq_path, output_dir)
 
     print(f'\t{fastq_path.name}')
-    with _open_fastq(fastq_path, 'rt') as in_f, gzip.open(out_path, 'wt') as out_f:
+    with _open_fastq(fastq_path, 'rt') as in_f, _open_fastq(out_path, 'wt', gz=True) as out_f:
         for header, sequence, plus, quality in iter_fastq_records(in_f):
             if not header.startswith('@'):
                 raise ValueError(f'Invalid fastq file: {fastq_path}')
@@ -205,5 +231,19 @@ def rc_fastq(fastq_path, output_dir):
 
 
 def rc_fastq_parallel(fastq_list, output_dir, parallel):
+    # list_fastq() searches recursively, but every output lands flat in
+    # `output_dir` under its input's basename -- so two same-named inputs
+    # from different subfolders (run1/S1_..._R1_001.fastq.gz and
+    # run2/S1_..._R1_001.fastq.gz, or a.fastq next to a.fastq.gz) would be
+    # written to the *same* output path by two workers at once, each
+    # truncating and overwriting the other's bytes: a corrupt gzip stream
+    # containing neither file's reads. Refused before any worker starts.
+    out_names = Counter(_rc_output_path(fq, output_dir).name for fq in fastq_list)
+    duplicates = sorted(name for name, n in out_names.items() if n > 1)
+    if duplicates:
+        raise ValueError(
+            'Two or more input fastq files (in different subfolders, or a .fastq next to its .fastq.gz) '
+            'would be written to the same output file name -- rename them or process the subfolders '
+            'separately: {}'.format(', '.join(duplicates)))
     with futures.ThreadPoolExecutor(max_workers=int(parallel)) as executor:
         list(executor.map(lambda fq: rc_fastq(fq, output_dir), fastq_list))

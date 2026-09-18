@@ -162,6 +162,34 @@ class TestEligibleCategoricalColumns:
         assert 'site' not in eligible_excluding_sampleD
 
 
+class TestReadsTheMetadataFileOnce:
+    """eligible_categorical_columns() and has_alpha_group_significance_column()
+    used to re-read and re-parse the whole metadata TSV once per categorical
+    column (class_sizes() -> read_metadata_table()), on top of
+    parse_metadata_columns()'s own read -- 1 + N file reads per call for N
+    categorical columns (4 for this 3-categorical-column fixture)."""
+
+    @pytest.fixture
+    def read_calls(self, monkeypatch):
+        calls = []
+        real_read = metadata_utils.read_metadata_rows
+
+        def counting_read(path):
+            calls.append(path)
+            return real_read(path)
+
+        monkeypatch.setattr(metadata_utils, 'read_metadata_rows', counting_read)
+        return calls
+
+    def test_eligible_categorical_columns(self, metadata_with_types, read_calls):
+        metadata_utils.eligible_categorical_columns(metadata_with_types, ['sampleA', 'sampleB', 'sampleC'])
+        assert len(read_calls) == 1
+
+    def test_has_alpha_group_significance_column(self, metadata_with_types, read_calls):
+        metadata_utils.has_alpha_group_significance_column(metadata_with_types, ['sampleA', 'sampleB', 'sampleC'])
+        assert len(read_calls) == 1
+
+
 class TestHasAlphaGroupSignificanceColumn:
     def test_false_when_every_sample_has_a_unique_value(self, tmp_path):
         """Regression test: qiime diversity alpha-group-significance fails
