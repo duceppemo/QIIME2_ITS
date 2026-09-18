@@ -28,6 +28,29 @@ def mock_pipeline(mocker, tmp_path):
     }
 
 
+class TestQueryFingerprint:
+    def test_same_search_string_gives_the_same_fingerprint(self):
+        assert train_ncbi._query_fingerprint('txid4762[Organism:exp]') == \
+            train_ncbi._query_fingerprint('txid4762[Organism:exp]')
+
+    def test_different_search_strings_give_different_fingerprints(self):
+        assert train_ncbi._query_fingerprint('query A') != train_ncbi._query_fingerprint('query B')
+
+    def test_accession_list_is_fingerprinted_by_content_not_path(self, tmp_path):
+        """Editing the accession-list file (same path, different content)
+        must count as a different query -- otherwise re-pointing -q at an
+        updated list in place would still incorrectly reuse the old
+        seq.fasta."""
+        acc_list = tmp_path / 'accessions.list'
+        acc_list.write_text('ACC1\nACC2\n')
+        first = train_ncbi._query_fingerprint(str(acc_list))
+
+        acc_list.write_text('ACC1\nACC2\nACC3\n')
+        second = train_ncbi._query_fingerprint(str(acc_list))
+
+        assert first != second
+
+
 class TestRun:
     def test_raises_if_qiime2_env_not_active(self, tmp_path, mock_env_check):
         """Regression test: run() used to never check this at all, unlike
@@ -52,22 +75,48 @@ class TestRun:
         classifier_path = mock_pipeline['train'].call_args.args[2]
         assert str(classifier_path).endswith('seq_ncbi.qza')
 
-    def test_reuses_existing_seq_fasta_with_a_warning(self, tmp_path, mock_pipeline, mocker, capsys):
-        """Regression test: an existing seq.fasta was silently reused with
-        no indication to the user -- dangerous for a crashed/partial prior
-        download, or a stale file from a different query reusing the same
-        output folder."""
+    def test_reuses_existing_seq_fasta_when_the_query_hash_matches(self, tmp_path, mock_pipeline, mocker, capsys):
+        """A prior run for the *same* query recorded its fingerprint
+        alongside seq.fasta -- reuse it without re-downloading."""
         output_folder = tmp_path / 'out'
         output_folder.mkdir()
         stale = output_folder / 'seq.fasta'
         stale.write_text('>OLD\nTTTT\n')
-        # mock_pipeline already patches download_sequences to write a fresh
-        # file; re-patch it here bare so we can assert it's never called.
+        (output_folder / 'seq.fasta.query_hash').write_text(
+            train_ncbi._query_fingerprint('some query') + '\n')
         mock_download = mocker.patch('qiime2_its.cli.train_ncbi.download_sequences')
 
         train_ncbi.run('some query', output_folder, 4, 'a@b.com', None,
                         tmp_path / 'taxdump.tar.gz', tmp_path / 'acc2taxid.gz', tmp_path / 'dead.gz')
 
         mock_download.assert_not_called()
-        assert 'seq.fasta' in capsys.readouterr().out
+        assert 'matches the current query' in capsys.readouterr().out
         assert stale.read_text() == '>OLD\nTTTT\n'  # untouched, not silently overwritten either
+
+    def test_redownloads_when_seq_fasta_exists_but_hash_does_not_match(self, tmp_path, mock_pipeline, capsys):
+        """Regression test: an existing seq.fasta used to be reused
+        unconditionally -- dangerous for a stale file from a *different*
+        query reusing the same output folder. No recorded hash at all (an
+        output folder from before this existed, or a crashed run that never
+        got to write one) is treated the same way: don't trust it."""
+        output_folder = tmp_path / 'out'
+        output_folder.mkdir()
+        stale = output_folder / 'seq.fasta'
+        stale.write_text('>OLD\nTTTT\n')
+        (output_folder / 'seq.fasta.query_hash').write_text(train_ncbi._query_fingerprint('a different query') + '\n')
+
+        train_ncbi.run('some query', output_folder, 4, 'a@b.com', None,
+                        tmp_path / 'taxdump.tar.gz', tmp_path / 'acc2taxid.gz', tmp_path / 'dead.gz')
+
+        mock_pipeline['import_seq'].assert_called_once()  # ran to completion on the fresh download
+        assert 'different query' in capsys.readouterr().out
+        assert stale.read_text() == '>ACC1\nACGT\n'  # overwritten by mock_pipeline's download_sequences
+
+    def test_records_query_hash_after_a_fresh_download(self, tmp_path, mock_pipeline):
+        output_folder = tmp_path / 'out'
+
+        train_ncbi.run('some query', output_folder, 4, 'a@b.com', None,
+                        tmp_path / 'taxdump.tar.gz', tmp_path / 'acc2taxid.gz', tmp_path / 'dead.gz')
+
+        recorded = (output_folder / 'seq.fasta.query_hash').read_text().strip()
+        assert recorded == train_ncbi._query_fingerprint('some query')

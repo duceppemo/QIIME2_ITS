@@ -1,5 +1,6 @@
 """Build a QIIME2 classifier from an NCBI nucleotide query (or accession list) plus taxonomy."""
 import argparse
+import hashlib
 import http.client
 import os
 from pathlib import Path
@@ -24,6 +25,20 @@ def _efetch_fasta(**kwargs):
     except (http.client.IncompleteRead, ValueError) as e:
         print(f'Network error ({e}). Retrying once...')
         return Entrez.efetch(db='nucleotide', rettype='fasta', retmode='text', **kwargs)
+
+
+def _query_fingerprint(query):
+    """A stable fingerprint of `query` for detecting whether a previously
+    downloaded seq.fasta was for the same query: hashes the file's own
+    content when `query` is a path to an accession list (so editing that
+    file, not just its path, counts as a new query), or the search string
+    itself otherwise."""
+    if os.path.isfile(query):
+        with open(query, 'rb') as f:
+            data = f.read()
+    else:
+        data = query.encode('utf-8')
+    return hashlib.sha256(data).hexdigest()
 
 
 def download_sequences(query, seq_file, email, api_key):
@@ -77,18 +92,27 @@ def run(query, output_folder, threads, email, api_key, taxdump, acc2taxid, dead_
 
     t_zero = time()
     seq_file = output_folder / 'seq.fasta'
-    if seq_file.exists():
-        # Skipping a re-download is a deliberate resume optimization (an
-        # NCBI query can be slow/rate-limited), but silently reusing this
-        # file is dangerous: it doesn't know whether it's actually a
-        # complete download for *this* query, a partial one left behind by
-        # a crashed prior run, or a stale one from a different query that
-        # happened to reuse this output folder -- so make that risk explicit
-        # rather than silently training on whatever's there.
-        print(f'{seq_file} already exists, reusing it instead of re-downloading -- delete it '
-              f'(or use a different -o) to force a fresh download for this query.')
+    query_hash_file = output_folder / 'seq.fasta.query_hash'
+    current_fingerprint = _query_fingerprint(query)
+    previous_fingerprint = query_hash_file.read_text().strip() if query_hash_file.exists() else None
+
+    # Skipping a re-download is a deliberate resume optimization (an NCBI
+    # query can be slow/rate-limited), but only when seq_file is actually
+    # for *this* query -- a fingerprint of the query (its own text, or its
+    # file's content for an accession-list query) is recorded alongside it
+    # so a different query reusing the same -o output folder is detected and
+    # re-downloaded instead of silently training on the wrong sequences.
+    # This does not detect a partial file left behind by a crashed download
+    # for the *same* query -- delete seq.fasta yourself to force a retry.
+    if seq_file.exists() and previous_fingerprint == current_fingerprint:
+        print(f'{seq_file} already exists and matches the current query, reusing it instead of '
+              f're-downloading -- delete it (or use a different -o) to force a fresh download.')
     else:
+        if seq_file.exists():
+            print(f'{seq_file} exists but is for a different query (or no record of the query that '
+                  f'produced it was found) -- re-downloading for the current query.')
         download_sequences(query, seq_file, email, api_key)
+        query_hash_file.write_text(current_fingerprint + '\n')
 
     start = time()
     if taxdump:
