@@ -360,6 +360,19 @@ class TestBuildReport:
         report_path = report.build_report(output_folder, metadata_path, report_column=None)
         assert report_path.exists()
 
+    def test_invalid_report_column_falls_back_with_a_warning_instead_of_degrading_silently(self, tmp_path, capsys):
+        """Regression test: a typo'd/nonexistent --report-metadata-column
+        used to fail silently -- every group-by-report_column lookup just
+        returns nothing for a column that doesn't exist, producing a
+        degraded report (blank groups) with no indication anything was
+        wrong. It should fall back to auto-selection instead, visibly."""
+        output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
+
+        report_path = report.build_report(output_folder, metadata_path, report_column='not-a-real-column')
+
+        assert report_path.exists()
+        assert 'not-a-real-column' in capsys.readouterr().out
+
     def test_works_with_missing_optional_artifacts(self, tmp_path):
         """A --skip-advanced-stats run won't have any of the group-
         significance/classifier/pcoa-export artifacts -- the report should

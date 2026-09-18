@@ -16,14 +16,17 @@ src/qiime2_its/
   cli/                  pipeline.py, fastq_rc.py, train_unite.py, train_ncbi.py, train_fasta.py
   fastq_utils.py         fastq listing/parsing/cleaning (pure Python)
   env_checks.py           conda-env/CPU/executable sanity checks
-  qiime_wrapper.py         `qiime ...`/`biom ...` subprocess command builders
+  qiime_wrapper.py         `qiime ...` subprocess command builders
+  biom_utils.py            `biom ...` subprocess command builders + taxonomy-in-BIOM merging
   itsxpress_wrapper.py     `qiime itsxpress ...` command builders
   size_filter.py           bbduk.sh command builders
   taxonomy.py              NCBI taxdump parsing + lineage-string construction
   downloader.py            generic download + tar.gz extraction
   metadata_utils.py        QIIME2 metadata TSV parsing, column eligibility
+  provenance.py            run-provenance/QA metadata (run_metadata.json)
   report_data.py           parses pipeline output (.qzv/.tsv) into plain data structures
   report.py                assembles report.pdf from report_data.py's output
+  timing.py                compact elapsed-time formatting ("1d2h3m4s")
 tests/                    unit tests, one file per module above
 validation/                real-data end-to-end validation (see Validation-Suite)
 ```

@@ -75,7 +75,6 @@ class Pipeline:
     def run(self):
         self.fastq_list = fastq_utils.list_fastq(self.input_folder)
         self.checks()
-        self.sample_dict = fastq_utils.parse_fastq_list(self.fastq_list)
         self.output_folder.mkdir(parents=True, exist_ok=True)
 
         input_folder = self.input_folder
@@ -86,6 +85,12 @@ class Pipeline:
             fastq_utils.rc_fastq_parallel(self.fastq_list, rc_folder, self.parallel)
             input_folder = rc_folder
             self.fastq_list = fastq_utils.list_fastq(rc_folder)
+
+        # Built from self.fastq_list as it stands now (i.e. after -rc, if
+        # used, has already pointed it at the reverse-complemented copies)
+        # so the QA report's "Input sample files" page and provenance record
+        # the files actually fed into the pipeline, not the pre-RC originals.
+        self.sample_dict = fastq_utils.parse_fastq_list(self.fastq_list)
 
         demux_qza = self.output_folder / 'demux-seqs.qza'
         needs_fastq_roundtrip = bool(self.its1 or self.its2) or self.min_len > 0 or self.max_len > 0

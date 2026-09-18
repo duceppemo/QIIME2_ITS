@@ -337,6 +337,16 @@ def build_report(output_folder, metadata_file, report_column=None):
     final_sample_ids = [sid for sid, freq in sample_frequencies.items() if freq > 0] \
         or list(metadata_table)
 
+    if report_column is not None and report_column not in metadata_utils.parse_metadata_columns(metadata_file):
+        # A typo'd/nonexistent --report-metadata-column used to fail
+        # silently: every group-by-report_column lookup downstream just
+        # returns nothing for a column that doesn't exist, producing a
+        # degraded report (blank groups, single "?" group in plots) with no
+        # indication anything was wrong.
+        print(f'Warning: --report-metadata-column "{report_column}" is not a column in {metadata_file} -- '
+              f'falling back to auto-selecting an eligible column instead.')
+        report_column = None
+
     if report_column is None:
         eligible = metadata_utils.eligible_categorical_columns(metadata_file, final_sample_ids)
         report_column = eligible[0] if eligible else None

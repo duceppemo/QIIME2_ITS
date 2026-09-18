@@ -3,6 +3,11 @@ import pytest
 from qiime2_its.cli import train_fasta
 
 
+@pytest.fixture(autouse=True)
+def mock_env_check(mocker):
+    return mocker.patch('qiime2_its.cli.train_fasta.env_checks.check_qiime2_env_active')
+
+
 def test_raises_if_fasta_missing(tmp_path):
     id_table = tmp_path / 'ids.tsv'
     id_table.write_text('ACC1\t1001\n')
@@ -15,6 +20,19 @@ def test_raises_if_id_table_missing(tmp_path):
     fasta.write_text('>ACC1\nACGT\n')
     with pytest.raises(ValueError, match='id-table'):
         train_fasta.run(fasta, tmp_path / 'missing.tsv', tmp_path / 'out', taxdump=None)
+
+
+def test_raises_if_qiime2_env_not_active(tmp_path, mock_env_check):
+    """Regression test: run() used to never check this at all, unlike
+    pipeline.py/train_unite.py -- a raw, confusing subprocess failure deep
+    inside qiime_wrapper instead of a clear, immediate message."""
+    mock_env_check.side_effect = EnvironmentError('You must activate your QIIME2 conda environment...')
+    fasta = tmp_path / 'seqs.fasta'
+    fasta.write_text('>ACC1\nACGT\n')
+    id_table = tmp_path / 'ids.tsv'
+    id_table.write_text('ACC1\t1001\n')
+    with pytest.raises(EnvironmentError, match='QIIME2 conda environment'):
+        train_fasta.run(fasta, id_table, tmp_path / 'out', taxdump=None)
 
 
 def test_full_run_orchestrates_expected_calls(tmp_path, mocker):

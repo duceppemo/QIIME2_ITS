@@ -3,13 +3,15 @@ import argparse
 from pathlib import Path
 from time import time
 
-from qiime2_its import downloader, qiime_wrapper, taxonomy, timing
+from qiime2_its import downloader, env_checks, qiime_wrapper, taxonomy, timing
 from qiime2_its._version import __version__
 
 TAXDUMP_URL = 'https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz'
 
 
 def run(fasta_query, id_table, output_folder, taxdump):
+    env_checks.check_qiime2_env_active()
+
     fasta_query = Path(fasta_query)
     id_table = Path(id_table)
     output_folder = Path(output_folder)

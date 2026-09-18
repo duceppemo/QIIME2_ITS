@@ -56,10 +56,13 @@ def fix_fasta(input_fasta, output_fasta):
             out_f.write(f'{line}\n')
 
 
-def run(url, output_folder):
+def run(url, output_folder, qiime2_env):
     output_folder = Path(output_folder)
     output_folder.mkdir(parents=True, exist_ok=True)
-    env_checks.check_qiime2_env_active()
+    active_env = env_checks.check_qiime2_env_active()
+    if qiime2_env != active_env:
+        print(f'Warning: -q/--qiime2 was "{qiime2_env}" but the active conda environment is '
+              f'"{active_env}" -- continuing with the active environment.')
 
     if os.path.isfile(url):
         archive = Path(url)
@@ -108,7 +111,7 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
-    run(args.url, args.output_folder)
+    run(args.url, args.output_folder, args.qiime2)
 
 
 if __name__ == '__main__':

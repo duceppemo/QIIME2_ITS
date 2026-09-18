@@ -96,7 +96,8 @@ class TestRun:
         archive = tmp_path / 'unite.tgz'
         archive.write_bytes(b'fake')
 
-        mocker.patch('qiime2_its.cli.train_unite.env_checks.check_qiime2_env_active')
+        mocker.patch('qiime2_its.cli.train_unite.env_checks.check_qiime2_env_active',
+                     return_value='rachis-qiime2-2026.7')
 
         def fake_extract(_archive, output_path):
             developer = Path(output_path) / 'developer'
@@ -109,10 +110,52 @@ class TestRun:
         mock_import_taxo = mocker.patch('qiime2_its.cli.train_unite.qiime_wrapper.import_taxonomy')
         mock_train = mocker.patch('qiime2_its.cli.train_unite.qiime_wrapper.train_naive_bayes_classifier')
 
-        train_unite.run(str(archive), output_folder)
+        train_unite.run(str(archive), output_folder, 'rachis-qiime2-2026.7')
 
         mock_import_seq.assert_called_once()
         mock_import_taxo.assert_called_once()
         mock_train.assert_called_once()
         classifier_path = mock_train.call_args.args[2]
         assert str(classifier_path).endswith('unite-ver10-99-classifier-19.02.2025.qza')
+
+    def test_warns_when_declared_env_does_not_match_the_active_one(self, tmp_path, mocker, capsys):
+        """Regression test: -q/--qiime2 used to be parsed but never passed to
+        run() at all, so it silently did nothing no matter what -- including
+        actually being a different environment than the one really active."""
+        output_folder = tmp_path / 'out'
+        archive = tmp_path / 'unite.tgz'
+        archive.write_bytes(b'fake')
+
+        mocker.patch('qiime2_its.cli.train_unite.env_checks.check_qiime2_env_active',
+                     return_value='rachis-qiime2-2026.7')
+
+        def fake_extract(_archive, output_path):
+            developer = Path(output_path) / 'developer'
+            developer.mkdir(parents=True, exist_ok=True)
+            (developer / 'sh_refs_qiime_ver10_99_19.02.2025.fasta').write_text('>a\nacgt\n')
+            (developer / 'sh_taxonomy_qiime_ver10_99_19.02.2025.txt').write_text('a\tk__Fungi\n')
+
+        mocker.patch('qiime2_its.cli.train_unite.downloader.extract_targz', side_effect=fake_extract)
+        mocker.patch('qiime2_its.cli.train_unite.qiime_wrapper.import_sequences')
+        mocker.patch('qiime2_its.cli.train_unite.qiime_wrapper.import_taxonomy')
+        mocker.patch('qiime2_its.cli.train_unite.qiime_wrapper.train_naive_bayes_classifier')
+
+        train_unite.run(str(archive), output_folder, 'some-other-env')
+
+        assert 'some-other-env' in capsys.readouterr().out
+
+
+class TestMain:
+    def test_every_parsed_arg_reaches_run(self, mocker):
+        """Regression test: -q/--qiime2 was parsed (and required) but main()
+        called run(args.url, args.output_folder) -- silently dropping it, so
+        it had zero effect no matter what the user passed. Nothing caught
+        this because nothing tested the parse_args() -> main() -> run()
+        wiring itself, only run() called directly."""
+        mock_run = mocker.patch('qiime2_its.cli.train_unite.run')
+        mocker.patch('sys.argv', ['qiime2-its-train-unite', '-u', 'unite.tgz',
+                                   '-o', '/out', '-q', 'rachis-qiime2-2026.7'])
+
+        train_unite.main()
+
+        mock_run.assert_called_once_with('unite.tgz', '/out', 'rachis-qiime2-2026.7')

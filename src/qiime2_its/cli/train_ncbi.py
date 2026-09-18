@@ -67,6 +67,8 @@ def download_sequences(query, seq_file, email, api_key):
 
 
 def run(query, output_folder, threads, email, api_key, taxdump, acc2taxid, dead_acc2taxid):
+    env_checks.check_qiime2_env_active()
+
     output_folder = Path(output_folder)
     if not query:
         raise ValueError('Your query is empty.')
@@ -75,7 +77,17 @@ def run(query, output_folder, threads, email, api_key, taxdump, acc2taxid, dead_
 
     t_zero = time()
     seq_file = output_folder / 'seq.fasta'
-    if not seq_file.exists():
+    if seq_file.exists():
+        # Skipping a re-download is a deliberate resume optimization (an
+        # NCBI query can be slow/rate-limited), but silently reusing this
+        # file is dangerous: it doesn't know whether it's actually a
+        # complete download for *this* query, a partial one left behind by
+        # a crashed prior run, or a stale one from a different query that
+        # happened to reuse this output folder -- so make that risk explicit
+        # rather than silently training on whatever's there.
+        print(f'{seq_file} already exists, reusing it instead of re-downloading -- delete it '
+              f'(or use a different -o) to force a fresh download for this query.')
+    else:
         download_sequences(query, seq_file, email, api_key)
 
     start = time()

@@ -27,8 +27,11 @@ Check that your classifier (UNITE is the broadest, most general-purpose option) 
 taxa you expect.
 
 **"You must activate your QIIME2 conda environment to run this script."**
-`qiime2-its` and friends check `$CONDA_DEFAULT_ENV` for something containing `qiime2` (matches both
-legacy `qiime2-*` and current `rachis-qiime2-*` naming) before doing anything else.
+`qiime2-its` and every classifier-training script (`qiime2-its-train-unite`/`-ncbi`/`-fasta` -- all
+of them actually call into QIIME2) check `$CONDA_DEFAULT_ENV` for something containing `qiime2`
+(matches both legacy `qiime2-*` and current `rachis-qiime2-*` naming) before doing anything else.
+`qiime2-its-rc` is the one exception -- it's pure Python (reverse-complementing fastq files) and
+never calls QIIME2 at all, so it doesn't need an activated environment either.
 `conda activate <your-qiime2-env>` first.
 
 **A sample-classifier column got skipped ("at least one class has fewer than 2 samples").**
