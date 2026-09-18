@@ -121,6 +121,27 @@ class TestPipelineChecks:
 
         pipeline.checks()  # should not raise despite bbduk.sh being "missing"
 
+    def test_warns_when_declared_env_does_not_match_the_active_one(self, mocker, tmp_path, monkeypatch, capsys):
+        """Regression test: -q/--qiime2 was accepted and recorded (for
+        provenance) but never actually cross-checked against the real active
+        environment -- so declaring one env while a different one was
+        actually active went unnoticed, same class of bug already fixed for
+        train_unite.py's -q."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path, qiime2='some-other-env')
+
+        pipeline.checks()
+
+        assert 'some-other-env' in capsys.readouterr().out
+
+    def test_no_warning_when_declared_env_matches_the_active_one(self, mocker, tmp_path, monkeypatch, capsys):
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path)  # qiime2 defaults to rachis-qiime2-2026.7 (REQUIRED)
+
+        pipeline.checks()
+
+        assert 'Warning' not in capsys.readouterr().out
+
     def test_empty_sample_rejected_with_clear_message(self, mocker, tmp_path, monkeypatch):
         """Regression test: a zero-read sample previously wasn't caught until
         several steps into the pipeline, where ITSxpress's HMM search fails

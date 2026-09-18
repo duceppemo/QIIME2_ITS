@@ -371,7 +371,10 @@ class Pipeline:
                 'DADA2 cannot process an empty sample -- remove it from the input folder and from '
                 'the metadata file before running.'.format(', '.join(empty_samples)))
 
-        env_checks.check_qiime2_env_active()
+        active_env = env_checks.check_qiime2_env_active()
+        if self.qiime2_env != active_env:
+            print(f'Warning: -q/--qiime2 was "{self.qiime2_env}" but the active conda environment is '
+                  f'"{active_env}" -- continuing with the active environment.')
 
         if self.its1 and self.its2:
             raise ValueError('You cannot choose both ITS1 and ITS2 for the same analysis.')
