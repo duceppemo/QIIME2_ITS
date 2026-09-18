@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt  # noqa: E402 (backend must be set before this i
 import pandas as pd  # noqa: E402
 from fpdf import FPDF  # noqa: E402
 
-from qiime2_its import metadata_utils, report_data  # noqa: E402
+from qiime2_its import metadata_utils, report_data, timing  # noqa: E402
 
 
 def _fig_to_png_bytes(fig):
@@ -158,7 +158,7 @@ def _run_info_rows(run_metadata):
     return [
         ('Run started', pipeline.get('start_time', '')),
         ('Run finished', pipeline.get('end_time', '')),
-        ('Run duration', f'{duration / 60:.1f} min' if duration is not None else ''),
+        ('Run duration', timing.format_elapsed(duration) if duration is not None else ''),
         ('Run by', f"{env.get('username', '')}@{env.get('hostname', '')}"),
         ('Platform', env.get('platform', '')),
         ('Conda environment', env.get('conda_env', '')),

@@ -182,9 +182,22 @@ class TestRunMetadataRows:
         rows = dict(report._run_info_rows(_SAMPLE_RUN_METADATA))
         assert rows['Run by'] == 'bioinfo@workstation'
         assert rows['QIIME2 framework version'] == '2026.7.0'
-        assert rows['Run duration'] == '2.5 min'
+        assert rows['Run duration'] == '2m30s'
         assert 'qiime2-its' in rows['Command invoked']
         assert rows['BBMap (bbduk.sh) version'] == '39.80'
+
+    def test_run_duration_omits_zero_leading_units(self):
+        """A sub-hour run shouldn't show '0d0h' -- and a multi-day one should
+        show real days, not an absurd number of minutes."""
+        under_an_hour = {**_SAMPLE_RUN_METADATA,
+                          'pipeline': {**_SAMPLE_RUN_METADATA['pipeline'], 'duration_seconds': 45.0}}
+        rows = dict(report._run_info_rows(under_an_hour))
+        assert rows['Run duration'] == '45s'
+
+        over_a_day = {**_SAMPLE_RUN_METADATA,
+                       'pipeline': {**_SAMPLE_RUN_METADATA['pipeline'], 'duration_seconds': 90000.0}}
+        rows = dict(report._run_info_rows(over_a_day))
+        assert rows['Run duration'] == '1d1h'
 
     def test_run_info_rows_reports_bbmap_not_installed(self):
         metadata = {**_SAMPLE_RUN_METADATA,
