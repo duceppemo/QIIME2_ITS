@@ -239,6 +239,38 @@ class TestDendrogramFigure:
         plt.close(fig)
 
 
+class TestGroupColorMap:
+    def test_deterministic_for_the_same_table(self):
+        """build_report() relies on computing this once and passing the same
+        dict to both the PCoA and dendrogram figures -- meaningless unless
+        calling it twice on the same input gives back the same mapping."""
+        table = {'sampleA': {'site': 'siteA'}, 'sampleB': {'site': 'siteB'}}
+        assert report._group_color_map(table, 'site') == report._group_color_map(table, 'site')
+
+    def test_groups_assigned_in_sorted_order(self):
+        table = {'sampleA': {'site': 'siteB'}, 'sampleB': {'site': 'siteA'}}
+        color_map = report._group_color_map(table, 'site')
+        assert color_map['siteA'] == report._COLORBLIND_PALETTE[0]
+        assert color_map['siteB'] == report._COLORBLIND_PALETTE[1]
+
+    def test_no_report_column_returns_empty_map(self):
+        assert report._group_color_map({'sampleA': {'site': 'siteA'}}, None) == {}
+
+
+class TestReadableTextColor:
+    def test_pale_color_is_darkened(self):
+        # The palette's yellow -- the concrete color that prompted this:
+        # legible as a dot/bar fill, too pale to read as small text.
+        darkened = report._readable_text_color('#F0E442')
+        assert darkened != '#F0E442'
+        r, g, b = (int(darkened[i:i + 2], 16) for i in (1, 3, 5))
+        brightness = (299 * r + 587 * g + 114 * b) / 1000
+        assert brightness <= 190
+
+    def test_already_dark_color_is_unchanged(self):
+        assert report._readable_text_color('#0072B2') == '#0072B2'
+
+
 class TestFitWidthMm:
     def test_landscape_figure_uses_default_width(self):
         import matplotlib.pyplot as plt

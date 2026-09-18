@@ -417,16 +417,43 @@ def _alpha_boxplot_figure(alpha_results, report_column):
     return fig
 
 
-def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_column, title):
+def _group_color_map(metadata_table, report_column):
+    """{group: color}, built once from every value of `report_column`
+    across the *whole* metadata table -- not just one figure's own sample
+    subset -- so the same group gets the same color on every figure that
+    colors by this column (PCoA, dendrogram), whatever subset of samples
+    that particular figure happens to plot."""
+    if not report_column:
+        return {}
+    groups = sorted({row.get(report_column, '?') for row in metadata_table.values()})
+    return {group: _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)] for i, group in enumerate(groups)}
+
+
+def _readable_text_color(hex_color):
+    """Darken `hex_color` if it's too pale to read as small text on a white
+    page (the palette's yellow, most visibly) -- used only where a palette
+    color labels text directly (dendrogram leaf labels/legend), never for
+    the dots/bars/lines elsewhere that same color fills, which read fine at
+    full brightness."""
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    brightness = (299 * r + 587 * g + 114 * b) / 1000
+    if brightness <= 190:
+        return hex_color
+    scale = 190 / brightness
+    return '#{:02x}{:02x}{:02x}'.format(round(r * scale), round(g * scale), round(b * scale))
+
+
+def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_column, title, group_color=None):
     fig, ax = plt.subplots(figsize=(6, 5))
     groups = sorted({metadata_table.get(sid, {}).get(report_column, '?') for sid in sample_coords})
-    for i, group in enumerate(groups):
+    group_color = group_color if group_color is not None else _group_color_map(metadata_table, report_column)
+    for group in groups:
         xs, ys = [], []
         for sid, (x, y) in sample_coords.items():
             if metadata_table.get(sid, {}).get(report_column, '?') == group:
                 xs.append(x)
                 ys.append(y)
-        color = _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)]
+        color = group_color.get(group, '#666666')
         # Semi-transparent fill + a thin outline: overlapping points (common
         # with pilot-scale sample counts) stay distinguishable from each
         # other and from a solid single-point marker instead of merging
@@ -444,7 +471,7 @@ def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_col
     return fig
 
 
-def _dendrogram_figure(distance_df, metadata_table, report_column, title):
+def _dendrogram_figure(distance_df, metadata_table, report_column, title, group_color=None):
     """UPGMA (average-linkage) hierarchical clustering of samples from a
     square distance matrix -- the standard complement to a PCoA scatter for
     the same distance metric. Leaf labels (not link colors) are colored by
@@ -472,22 +499,28 @@ def _dendrogram_figure(distance_df, metadata_table, report_column, title):
 
     if report_column:
         groups = sorted({metadata_table.get(sid, {}).get(report_column, '?') for sid in sample_ids})
-        group_color = {group: _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)]
-                       for i, group in enumerate(groups)}
+        group_color = group_color if group_color is not None else _group_color_map(metadata_table, report_column)
+        # Darkened for text/legend readability (some palette colors, e.g.
+        # yellow, are too pale to read as small text even though they're
+        # fine as a dot/bar/line fill) -- the underlying group_color mapping
+        # itself stays untouched so it matches the PCoA page's dot colors.
+        text_color = {group: _readable_text_color(group_color.get(group, '#000000')) for group in groups}
         tick_labels = ax.get_yticklabels() if orientation == 'left' else ax.get_xticklabels()
         for tick_label in tick_labels:
             group = metadata_table.get(tick_label.get_text(), {}).get(report_column, '?')
-            tick_label.set_color(group_color.get(group, 'black'))
-        handles = [Line2D([0], [0], color=color, lw=4, label=group) for group, color in group_color.items()]
+            tick_label.set_color(text_color.get(group, 'black'))
+        handles = [Line2D([0], [0], color=text_color[group], lw=4, label=group) for group in groups]
         if orientation == 'left':
             # The leaf labels themselves (not just the plotted lines) sit at
             # the right edge of the axes here, so a legend placed just
             # outside that edge (as used for every other figure in this
             # report) would overlap the top labels' text instead of clearing
             # it. Placed above the axes instead, where nothing else is
-            # drawn.
+            # drawn. Left-aligned rather than mode='expand': stretching a
+            # short handful of entries across the full axes width read as
+            # an odd gap-filled bar rather than a normal legend.
             ax.legend(handles=handles, fontsize=9, frameon=True, loc='lower left',
-                      bbox_to_anchor=(0, 1.01, 1, 0.05), mode='expand', ncol=min(len(handles), 4))
+                      bbox_to_anchor=(0, 1.01), ncol=min(len(handles), 4))
         else:
             ax.legend(handles=handles, fontsize=9, frameon=True, bbox_to_anchor=(1.02, 1), loc='upper left')
 
@@ -714,6 +747,11 @@ def build_report(output_folder, metadata_file, report_column=None):
                             intro=_INTRO_BETA_TABLE)
 
     if report_column:
+        # Computed once so the same group gets the same color on both the
+        # PCoA and dendrogram pages, for both distance metrics, rather than
+        # each figure picking its own colors from whatever subset of
+        # samples/groups it happens to see.
+        group_color = _group_color_map(metadata_table, report_column)
         for metric in ('bray_curtis', 'unweighted_unifrac'):
             metric_display = _METRIC_DISPLAY_NAMES.get(metric, metric)
             ordination_path = output_folder / 'core-metrics-results' / f'{metric}_pcoa_export' / 'ordination.txt'
@@ -721,14 +759,15 @@ def build_report(output_folder, metadata_file, report_column=None):
                 sample_coords, proportion_explained = report_data.parse_ordination(ordination_path)
                 pdf.add_figure_page(f'{metric_display} PCoA', _pcoa_figure(
                     sample_coords, proportion_explained, metadata_table, report_column,
-                    f'{metric_display} (colored by {report_column})'), intro=_INTRO_PCOA)
+                    f'{metric_display} (colored by {report_column})', group_color=group_color), intro=_INTRO_PCOA)
 
             distance_path = output_folder / 'core-metrics-results' / f'{metric}_distance_export' / \
                 'distance-matrix.tsv'
             if distance_path.exists():
                 distance_df = report_data.parse_distance_matrix(distance_path)
                 dendrogram_fig = _dendrogram_figure(distance_df, metadata_table, report_column,
-                                                     f'{metric_display} (UPGMA, colored by {report_column})')
+                                                     f'{metric_display} (UPGMA, colored by {report_column})',
+                                                     group_color=group_color)
                 pdf.add_figure_page(f'{metric_display} sample clustering', dendrogram_fig,
                                      width=_fit_width_mm(dendrogram_fig), intro=_INTRO_DENDROGRAM)
 
