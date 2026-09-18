@@ -127,7 +127,7 @@ for what these actually produce.
 |---|---|
 | `--skip-advanced-stats` | Skip group-significance tests, taxonomy collapse, and sample classification. |
 | `--skip-report` | Skip building the PDF summary report. |
-| `--report-metadata-column` | Categorical column the report's alpha/beta plots are grouped by. Defaults to the first eligible (≥2 distinct values, ≥2 samples each) column. Group-significance/classification still run against every eligible column regardless of this choice. |
+| `--report-metadata-column` | Categorical column always shown in the report's alpha/beta plots, even if not itself significant. Defaults to the first eligible (≥2 distinct values, ≥2 samples each) column. Any other eligible column with a statistically significant result (p < 0.05) also gets its own plots. Group-significance/classification still run against every eligible column regardless of this choice. |
 
 ## `qiime2-its-rc`
 

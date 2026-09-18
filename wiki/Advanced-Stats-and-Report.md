@@ -21,13 +21,23 @@ taxonomy → barplot), `qiime2-its` also runs:
    category has only one non-zero-read sample) is caught and skipped with a message, not fatal to
    the run.
 5. **A PDF report** (`<output>/report.pdf`): run summary, QA/provenance pages (see below), DADA2
-   read retention table, alpha diversity group-significance table + boxplots, beta diversity
-   group-significance table + PCoA plots (Bray-Curtis and unweighted UniFrac), genus-level
-   relative-abundance chart, the rarefaction curve, and sample-classifier accuracy (if any column
-   succeeded). Built with matplotlib + [fpdf2](https://pypi.org/project/fpdf2/) — no LaTeX, no
-   browser rendering, no heavy system dependencies. It discovers what to include by scanning the
-   output folder for whichever of the artifacts above were actually produced, so it degrades
-   gracefully if you pass `--skip-advanced-stats`.
+   read retention table, representative-sequence length distribution, alpha diversity
+   group-significance table + boxplots, beta diversity group-significance table + PCoA plots and
+   UPGMA clustering dendrograms (Bray-Curtis and unweighted UniFrac), genus-level relative-abundance
+   chart, taxonomic classification confidence distribution, the rarefaction curve, and
+   sample-classifier accuracy (if any column succeeded). Built with matplotlib +
+   [fpdf2](https://pypi.org/project/fpdf2/) + [scipy](https://scipy.org/) — no LaTeX, no browser
+   rendering, no heavy system dependencies. It discovers what to include by scanning the output
+   folder for whichever of the artifacts above were actually produced, so it degrades gracefully if
+   you pass `--skip-advanced-stats`.
+
+   The alpha/beta figures aren't limited to one metadata column: every eligible column whose
+   group-significance test comes back statistically significant (p < 0.05, for at least one metric)
+   gets its own boxplot/PCoA/dendrogram, in addition to `--report-metadata-column`'s column (always
+   shown, even when it isn't itself significant, so there's always at least one grouped view). Beta
+   diversity figures are grouped one sub-section per metadata column — both distance metrics' PCoA
+   and dendrogram together — rather than interleaved, and each page's intro text says why that
+   column is shown (significant vs. default).
 
 ## QA / provenance
 
@@ -73,7 +83,13 @@ want the group-significance/classifier artifacts but not the report, or vice ver
   table-genus.qza, table-genus-relative.qza
   sample-classifier-<column>/                    # one per eligible, non-skipped column
   dada2_stats/, sample_frequencies/               # plain-text exports the report reads
+  rep_seqs_export/dna-sequences.fasta             # plain-text FASTA the report reads for
+                                                   # its sequence-length distribution
+  biom_table/taxonomy.tsv                         # also the source of the report's
+                                                   # classification-confidence distribution
   core-metrics-results/<metric>_pcoa_export/      # plain-text PCoA exports the report reads
+  core-metrics-results/<metric>_distance_export/  # plain-text distance-matrix exports the
+                                                   # report reads for its UPGMA dendrograms
   run_metadata.json                              # QA/provenance record, see above
   report.pdf
 ```

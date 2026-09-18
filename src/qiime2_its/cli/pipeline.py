@@ -481,11 +481,14 @@ def build_parser():
     advanced.add_argument('--skip-report', action='store_true',
                            help='Skip building the PDF summary report.')
     advanced.add_argument('--report-metadata-column', metavar='COLUMN', default=None, type=str,
-                           help='Categorical metadata column to group the PDF report\'s alpha/beta '
-                                'diversity plots by. Defaults to the first eligible (>=2 distinct '
-                                'values, >=2 samples each) categorical column. Group-significance '
-                                'tests and sample classification still run against every eligible '
-                                'column regardless of this choice -- it only affects the report.')
+                           help='Categorical metadata column always shown in the PDF report\'s '
+                                'alpha/beta diversity plots, even if it is not itself statistically '
+                                'significant. Defaults to the first eligible (>=2 distinct values, '
+                                '>=2 samples each) categorical column. Any other eligible column '
+                                'whose group-significance test comes back significant (p < 0.05) '
+                                'gets its own plots too, regardless of this choice -- it only sets '
+                                'the default. Group-significance tests and sample classification '
+                                'still run against every eligible column either way.')
 
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     return parser
