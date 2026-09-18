@@ -236,6 +236,11 @@ _DADA2_COLUMN_LABELS = {
 # '-' because metadata column names can themselves contain hyphens (e.g. "host-plant").
 _BETA_DISTANCE_METRICS = ('bray_curtis', 'unweighted_unifrac')
 
+_METRIC_DISPLAY_NAMES = {
+    'bray_curtis': 'Bray-Curtis',
+    'unweighted_unifrac': 'Unweighted UniFrac',
+}
+
 
 def _split_beta_stem(stem):
     stem = stem.removeprefix('beta-group-significance-')
@@ -400,7 +405,7 @@ def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_col
     ax.set_xlabel(f'PC1 ({proportion_explained[0] * 100:.1f}%)')
     ax.set_ylabel(f'PC2 ({proportion_explained[1] * 100:.1f}%)')
     ax.set_title(title)
-    ax.legend(fontsize=9, frameon=False)
+    ax.legend(fontsize=9, frameon=True)
     fig.tight_layout()
     return fig
 
@@ -452,7 +457,7 @@ def _genus_barplot_figure(genus_table):
                            edgecolor='white', linewidth=0.4)
         ax.set_ylabel('Relative abundance')
     ax.tick_params(axis='both', labelsize=10)
-    ax.legend(fontsize=10, bbox_to_anchor=(1.02, 1), loc='upper left', frameon=False)
+    ax.legend(fontsize=10, bbox_to_anchor=(1.02, 1), loc='upper left', frameon=True)
     fig.tight_layout()
     return fig
 
@@ -475,7 +480,7 @@ def _rarefaction_figure(curves, metric):
     ax.set_ylabel(metric)
     ax.set_title(f'Rarefaction curve ({metric})')
     ax.legend(fontsize=8.5 if many_samples else 9, ncol=2 if many_samples else 1,
-              bbox_to_anchor=(1.02, 1), loc='upper left', frameon=False)
+              bbox_to_anchor=(1.02, 1), loc='upper left', frameon=True)
     fig.tight_layout()
     return fig
 
@@ -581,9 +586,10 @@ def build_report(output_folder, metadata_file, report_column=None):
             ordination_path = output_folder / 'core-metrics-results' / f'{metric}_pcoa_export' / 'ordination.txt'
             if ordination_path.exists():
                 sample_coords, proportion_explained = report_data.parse_ordination(ordination_path)
-                pdf.add_figure_page(f'{metric} PCoA', _pcoa_figure(
+                metric_display = _METRIC_DISPLAY_NAMES.get(metric, metric)
+                pdf.add_figure_page(f'{metric_display} PCoA', _pcoa_figure(
                     sample_coords, proportion_explained, metadata_table, report_column,
-                    f'{metric} (colored by {report_column})'), intro=_INTRO_PCOA)
+                    f'{metric_display} (colored by {report_column})'), intro=_INTRO_PCOA)
 
     # 5. Genus-level composition
     biom_taxo_path = output_folder / 'biom_table' / 'table-with-taxonomy.biom.tsv'
