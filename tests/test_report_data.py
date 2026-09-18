@@ -279,6 +279,22 @@ class TestParseFastaSequenceLengths:
         assert report_data.parse_fasta_sequence_lengths(path) == []
 
 
+class TestParseDistanceMatrix:
+    def test_parses_square_matrix_indexed_by_sample_id(self, tmp_path):
+        path = tmp_path / 'distance-matrix.tsv'
+        path.write_text(
+            '\tsiteA\tsiteB\tsiteC\n'
+            'siteA\t0.0\t0.5\t0.8\n'
+            'siteB\t0.5\t0.0\t0.3\n'
+            'siteC\t0.8\t0.3\t0.0\n'
+        )
+        df = report_data.parse_distance_matrix(path)
+        assert list(df.index) == ['siteA', 'siteB', 'siteC']
+        assert list(df.columns) == ['siteA', 'siteB', 'siteC']
+        assert df.loc['siteA', 'siteB'] == 0.5
+        assert df.loc['siteB', 'siteC'] == 0.3
+
+
 class TestParseTaxonomyConfidence:
     def test_parses_confidence_column(self, tmp_path):
         path = tmp_path / 'taxonomy.tsv'

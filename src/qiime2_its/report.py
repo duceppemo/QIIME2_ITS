@@ -15,8 +15,11 @@ from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402 (backend must be set before this import)
+from matplotlib.lines import Line2D  # noqa: E402
 import pandas as pd  # noqa: E402
 from fpdf import FPDF  # noqa: E402
+from scipy.cluster.hierarchy import dendrogram, linkage  # noqa: E402
+from scipy.spatial.distance import squareform  # noqa: E402
 
 from qiime2_its import metadata_utils, report_data, timing  # noqa: E402
 
@@ -296,6 +299,12 @@ _INTRO_PCOA = (
     'for visualization; samples that cluster together have more similar community composition. The '
     'percentage on each axis is the proportion of total variance it explains.'
 )
+_INTRO_DENDROGRAM = (
+    'UPGMA hierarchical clustering of samples from the same pairwise distance matrix used for the '
+    'PCoA above; samples that join at a shorter distance are more similar in community composition. '
+    'Unlike PCoA, this preserves the exact pairwise distances rather than a two-dimensional '
+    'approximation of them.'
+)
 _INTRO_GENUS = (
     'Relative abundance of the most abundant genera in each sample, collapsed from the classifier\'s '
     'taxonomic assignments. "Unclassified" covers features the classifier could not assign to a '
@@ -431,6 +440,67 @@ def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_col
     # legend never sits on top of a data point, whatever the point cloud's
     # shape happens to be for a given run's data.
     ax.legend(fontsize=9, frameon=True, bbox_to_anchor=(1.02, 1), loc='upper left')
+    fig.tight_layout()
+    return fig
+
+
+def _dendrogram_figure(distance_df, metadata_table, report_column, title):
+    """UPGMA (average-linkage) hierarchical clustering of samples from a
+    square distance matrix -- the standard complement to a PCoA scatter for
+    the same distance metric. Leaf labels (not link colors) are colored by
+    `report_column`: scipy's own automatic link coloring is a cluster-shape
+    heuristic unrelated to metadata groups, and would visually compete with
+    a metadata-driven color coding here."""
+    sample_ids = list(distance_df.index)
+    condensed = squareform(distance_df.values, checks=False)
+    link = linkage(condensed, method='average')
+
+    many_samples = len(sample_ids) > _MANY_SAMPLES_THRESHOLD
+    if many_samples:
+        # Leaves along the y-axis (one row per sample), like the genus
+        # barplot's many-sample layout, so labels stay readable instead of
+        # crowding along a fixed-width x-axis.
+        fig, ax = plt.subplots(figsize=(7, max(5, 0.25 * len(sample_ids))))
+        orientation = 'left'
+    else:
+        fig, ax = plt.subplots(figsize=(max(6, 0.5 * len(sample_ids)), 5))
+        orientation = 'top'
+
+    dendrogram(link, labels=sample_ids, ax=ax, orientation=orientation,
+               leaf_rotation=0 if many_samples else 90, leaf_font_size=9,
+               color_threshold=0, above_threshold_color='#444444')
+
+    if report_column:
+        groups = sorted({metadata_table.get(sid, {}).get(report_column, '?') for sid in sample_ids})
+        group_color = {group: _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)]
+                       for i, group in enumerate(groups)}
+        tick_labels = ax.get_yticklabels() if orientation == 'left' else ax.get_xticklabels()
+        for tick_label in tick_labels:
+            group = metadata_table.get(tick_label.get_text(), {}).get(report_column, '?')
+            tick_label.set_color(group_color.get(group, 'black'))
+        handles = [Line2D([0], [0], color=color, lw=4, label=group) for group, color in group_color.items()]
+        if orientation == 'left':
+            # The leaf labels themselves (not just the plotted lines) sit at
+            # the right edge of the axes here, so a legend placed just
+            # outside that edge (as used for every other figure in this
+            # report) would overlap the top labels' text instead of clearing
+            # it. Placed above the axes instead, where nothing else is
+            # drawn.
+            ax.legend(handles=handles, fontsize=9, frameon=True, loc='lower left',
+                      bbox_to_anchor=(0, 1.01, 1, 0.05), mode='expand', ncol=min(len(handles), 4))
+        else:
+            ax.legend(handles=handles, fontsize=9, frameon=True, bbox_to_anchor=(1.02, 1), loc='upper left')
+
+    # A figure-level title (rather than ax.set_title): tight_layout reserves
+    # room for it above everything else, including the legend placed just
+    # above the axes in the 'left'-orientation case -- an axes-level title
+    # sits right at the axes edge instead, which the legend there would
+    # overlap.
+    fig.suptitle(title, fontsize=13)
+    if orientation == 'left':
+        ax.set_xlabel('Distance')
+    else:
+        ax.set_ylabel('Distance')
     fig.tight_layout()
     return fig
 
@@ -645,13 +715,22 @@ def build_report(output_folder, metadata_file, report_column=None):
 
     if report_column:
         for metric in ('bray_curtis', 'unweighted_unifrac'):
+            metric_display = _METRIC_DISPLAY_NAMES.get(metric, metric)
             ordination_path = output_folder / 'core-metrics-results' / f'{metric}_pcoa_export' / 'ordination.txt'
             if ordination_path.exists():
                 sample_coords, proportion_explained = report_data.parse_ordination(ordination_path)
-                metric_display = _METRIC_DISPLAY_NAMES.get(metric, metric)
                 pdf.add_figure_page(f'{metric_display} PCoA', _pcoa_figure(
                     sample_coords, proportion_explained, metadata_table, report_column,
                     f'{metric_display} (colored by {report_column})'), intro=_INTRO_PCOA)
+
+            distance_path = output_folder / 'core-metrics-results' / f'{metric}_distance_export' / \
+                'distance-matrix.tsv'
+            if distance_path.exists():
+                distance_df = report_data.parse_distance_matrix(distance_path)
+                dendrogram_fig = _dendrogram_figure(distance_df, metadata_table, report_column,
+                                                     f'{metric_display} (UPGMA, colored by {report_column})')
+                pdf.add_figure_page(f'{metric_display} sample clustering', dendrogram_fig,
+                                     width=_fit_width_mm(dendrogram_fig), intro=_INTRO_DENDROGRAM)
 
     # 5. Genus-level composition
     biom_taxo_path = output_folder / 'biom_table' / 'table-with-taxonomy.biom.tsv'

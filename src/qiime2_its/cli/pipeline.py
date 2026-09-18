@@ -237,11 +237,14 @@ class Pipeline:
                         distance_qza, self.metadata_file, column,
                         self.output_folder / f'beta-group-significance-{column}-{metric}.qzv')
 
-        print('Exporting PCoA ordinations...')
+        print('Exporting PCoA ordinations and distance matrices...')
         for metric in ('bray_curtis', 'unweighted_unifrac'):
             pcoa_qza = core_metrics_dir / f'{metric}_pcoa_results.qza'
             if pcoa_qza.exists():
                 qiime_wrapper.export(pcoa_qza, core_metrics_dir / f'{metric}_pcoa_export')
+            distance_qza = core_metrics_dir / f'{metric}_distance_matrix.qza'
+            if distance_qza.exists():
+                qiime_wrapper.export(distance_qza, core_metrics_dir / f'{metric}_distance_export')
 
         # Genus (level 6) if the classifier resolved that deep for enough of
         # this dataset; qiime taxa collapse otherwise fails outright if the

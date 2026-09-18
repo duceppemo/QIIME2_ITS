@@ -304,6 +304,13 @@ def parse_taxonomy_confidence(taxonomy_tsv_path):
     return pd.to_numeric(df[confidence_col], errors='coerce').dropna().tolist()
 
 
+def parse_distance_matrix(distance_matrix_tsv_path):
+    """Square distance matrix export (e.g. bray_curtis_distance_matrix.qza,
+    via `qiime tools export`) as a DataFrame indexed and columned by sample
+    id, in the same order as the file's own row/column order."""
+    return pd.read_csv(distance_matrix_tsv_path, sep='\t', index_col=0)
+
+
 def parse_run_metadata(run_metadata_json_path):
     """Parse run_metadata.json (written by cli/pipeline.py via
     provenance.write_run_metadata()) into a plain dict, or None if it

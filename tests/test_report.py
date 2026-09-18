@@ -79,6 +79,15 @@ def _build_synthetic_output_folder(tmp_path):
             'sampleA\t0.4\t-0.1\nsampleB\t-0.5\t-0.05\nsampleC\t0.1\t0.2\nsampleD\t0.0\t0.0\n\n'
             'Biplot\t0\t0\n\nSite constraints\t0\t0\n'
         )
+        dm_dir = out / 'core-metrics-results' / f'{metric}_distance_export'
+        dm_dir.mkdir(parents=True)
+        (dm_dir / 'distance-matrix.tsv').write_text(
+            '\tsampleA\tsampleB\tsampleC\tsampleD\n'
+            'sampleA\t0.0\t0.3\t0.6\t0.7\n'
+            'sampleB\t0.3\t0.0\t0.5\t0.6\n'
+            'sampleC\t0.6\t0.5\t0.0\t0.2\n'
+            'sampleD\t0.7\t0.6\t0.2\t0.0\n'
+        )
 
     _write_alpha_qzv(out / 'alpha-group-significance-shannon.qzv', {
         'site': (0.9, 0.6, {'siteA (n=2)': [0.97, 1.5], 'siteB (n=2)': [1.2, 1.3]}),
@@ -186,6 +195,48 @@ class TestColumnWidths:
             ['a', 'b', 'c'],
             [['short', 'a moderately long value here', 'x']])
         assert sum(widths) <= available
+
+
+class TestDendrogramFigure:
+    def test_builds_a_figure_with_one_axes(self):
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        distance_df = pd.DataFrame(
+            [[0.0, 0.3, 0.6], [0.3, 0.0, 0.5], [0.6, 0.5, 0.0]],
+            index=['sampleA', 'sampleB', 'sampleC'], columns=['sampleA', 'sampleB', 'sampleC'])
+        metadata_table = {'sampleA': {'site': 'siteA'}, 'sampleB': {'site': 'siteA'},
+                           'sampleC': {'site': 'siteB'}}
+        fig = report._dendrogram_figure(distance_df, metadata_table, 'site', 'title')
+        assert len(fig.axes) == 1
+        plt.close(fig)
+
+    def test_leaf_labels_include_every_sample(self):
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        distance_df = pd.DataFrame(
+            [[0.0, 0.3, 0.6], [0.3, 0.0, 0.5], [0.6, 0.5, 0.0]],
+            index=['sampleA', 'sampleB', 'sampleC'], columns=['sampleA', 'sampleB', 'sampleC'])
+        fig = report._dendrogram_figure(distance_df, {}, None, 'title')
+        labels = {t.get_text() for t in fig.axes[0].get_xticklabels()}
+        assert labels == {'sampleA', 'sampleB', 'sampleC'}
+        plt.close(fig)
+
+    def test_switches_to_left_orientation_past_the_sample_threshold(self):
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        n = report._MANY_SAMPLES_THRESHOLD + 1
+        ids = [f'sample{i}' for i in range(n)]
+        import numpy as np
+        rng = np.random.default_rng(0)
+        values = rng.random((n, n))
+        values = (values + values.T) / 2
+        for i in range(n):
+            values[i, i] = 0.0
+        distance_df = pd.DataFrame(values, index=ids, columns=ids)
+        fig = report._dendrogram_figure(distance_df, {}, None, 'title')
+        labels = {t.get_text() for t in fig.axes[0].get_yticklabels()}
+        assert labels == set(ids)
+        plt.close(fig)
 
 
 class TestFitWidthMm:
