@@ -21,6 +21,22 @@ class TestParseSampleFrequencies:
         frequencies = report_data.parse_sample_frequencies(path)
         assert frequencies == {'siteA-rep1': 19.0, 'siteC-rep2': 0.0}
 
+    def test_parses_thousands_separated_frequencies(self, tmp_path):
+        """Regression test: QIIME2 writes this file with a comma thousands
+        separator once a sample's frequency reaches four digits (e.g.
+        "110,406.0") -- found running against a real 53-sample production
+        dataset whose samples had ~100k+ reads each; every fixture used
+        before that had frequencies too small to trigger it."""
+        path = tmp_path / 'sample-frequencies.tsv'
+        path.write_text(
+            'Sample ID\tFrequency\tNo. of Associated Features\n'
+            '#q2:types\tcategorical\tcategorical\n'
+            'K.BeL.1.1\t110,406.0\t425\n'
+            'P.Leg.1.1\t389,161.0\t494\n'
+        )
+        frequencies = report_data.parse_sample_frequencies(path)
+        assert frequencies == {'K.BeL.1.1': 110406.0, 'P.Leg.1.1': 389161.0}
+
 
 class TestParseDada2Stats:
     def test_parses_and_coerces_numeric_columns(self, tmp_path):

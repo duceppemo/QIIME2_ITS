@@ -30,6 +30,11 @@ def parse_sample_frequencies(sample_frequencies_tsv_path):
     can silently turn a nominally-eligible metadata column into an
     ineligible one. Callers should exclude zero-frequency samples before
     computing group eligibility.
+
+    QIIME2 writes this file with thousands separators once a sample's
+    frequency reaches four digits (e.g. "110,406.0", confirmed against a
+    real 53-sample production run whose samples had ~100k+ reads each --
+    every fixture used before that had frequencies too small to trigger it).
     """
     frequencies = {}
     with open(sample_frequencies_tsv_path) as f:
@@ -38,7 +43,7 @@ def parse_sample_frequencies(sample_frequencies_tsv_path):
             fields = line.rstrip('\n').split('\t')
             if not fields or fields[0] in ('', '#q2:types'):
                 continue
-            frequencies[fields[0]] = float(fields[1])
+            frequencies[fields[0]] = float(fields[1].replace(',', ''))
     return frequencies
 
 
