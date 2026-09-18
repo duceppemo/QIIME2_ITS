@@ -20,6 +20,46 @@ from fpdf import FPDF  # noqa: E402
 
 from qiime2_its import metadata_utils, report_data, timing  # noqa: E402
 
+# Okabe-Ito: the standard colorblind-safe categorical palette (Okabe & Ito
+# 2008; also published as the "Wong" palette, Wong 2011, Nature Methods) --
+# 8 colors chosen to stay distinguishable under the common forms of color
+# vision deficiency. Used for every categorical color in this report instead
+# of matplotlib's default cycle.
+_COLORBLIND_PALETTE = [
+    '#0072B2',  # blue
+    '#E69F00',  # orange
+    '#009E73',  # bluish green
+    '#CC79A7',  # reddish purple
+    '#D55E00',  # vermillion
+    '#56B4E9',  # sky blue
+    '#F0E442',  # yellow
+    '#000000',  # black
+]
+# Fixed, non-cycled color for a chart's "Other"/"Unclassified" catch-all
+# category, so it never coincides with a real category's color and reads
+# consistently as "not a specific answer" the way grey conventionally does.
+# Deliberately darker than a typical "muted" grey (#999999): checked against
+# a real rendered report, that lighter grey read as visually indistinguishable
+# from the page's white background, making a real (and often large, for
+# "Unclassified") segment look like a gap in the bar instead.
+_NEUTRAL_GREY = '#666666'
+
+plt.rcParams.update({
+    'axes.prop_cycle': plt.cycler(color=_COLORBLIND_PALETTE),
+    'font.size': 10,
+    'axes.titlesize': 12,
+    'axes.labelsize': 10,
+    'legend.fontsize': 9,
+    'xtick.labelsize': 9,
+    'ytick.labelsize': 9,
+    'axes.spines.top': False,
+    'axes.spines.right': False,
+    'axes.grid': True,
+    'grid.alpha': 0.3,
+    'grid.linewidth': 0.5,
+    'figure.dpi': 150,
+})
+
 
 def _fig_to_png_bytes(fig):
     buf = io.BytesIO()
@@ -42,6 +82,17 @@ class _ReportPDF(FPDF):
         self.set_font('Helvetica', 'B', 14)
         self.cell(0, 10, title, new_x='LMARGIN', new_y='NEXT')
         self.ln(1)
+
+    def add_intro_text(self, text):
+        """A short explanatory paragraph under a section title -- what the
+        analysis on this page actually shows, set apart from the data itself
+        (italic, grey) the way a figure caption or methods note would be."""
+        self.set_font('Helvetica', 'I', 9)
+        self.set_text_color(90, 90, 90)
+        self.set_x(self.l_margin)
+        self.multi_cell(0, 5, text)
+        self.set_text_color(0, 0, 0)
+        self.ln(2)
 
     def add_title_page(self, title, lines, logo=None):
         self.add_page()
@@ -87,59 +138,90 @@ class _ReportPDF(FPDF):
         pad = 2 * self.c_margin + 2
         col_widths = []
         for col_idx, h in enumerate(header):
-            self.set_font('Helvetica', 'B', 8)
+            self.set_font('Helvetica', 'B', 9)
             natural = self.get_string_width(str(h))
-            self.set_font('Helvetica', '', 8)
+            self.set_font('Helvetica', '', 9)
             for row in rows:
                 natural = max(natural, self.get_string_width(str(row[col_idx])))
             col_widths.append(min(equal_width, natural + pad))
         return col_widths
 
-    def add_table_page(self, title, header, rows):
+    def add_table_page(self, title, header, rows, intro=None):
         # Wide tables (many columns, e.g. DADA2 retention) get cramped in
         # portrait; landscape gives them roughly 40% more width.
         orientation = 'L' if len(header) > 5 else 'P'
         self.add_page(orientation=orientation)
         self.section_title(title)
+        if intro:
+            self.add_intro_text(intro)
         if not rows:
             self.set_font('Helvetica', '', 10)
             self.cell(0, 8, '(no data)', new_x='LMARGIN', new_y='NEXT')
             return
+
+        # A classic academic "three-line" table (rule / header / rule ...
+        # rule) instead of a full grid: no vertical borders at all, subtle
+        # zebra striping on the data rows instead (this report's tables can
+        # run to 50+ rows, where striping matters more for readability than
+        # it does for a handful).
         col_widths = self._column_widths(header, rows)
-        self.set_font('Helvetica', 'B', 8)
+        table_width = sum(col_widths)
+        x_start = self.l_margin
+
+        self.set_draw_color(50, 50, 50)
+        self.set_line_width(0.4)
+        self.line(x_start, self.get_y(), x_start + table_width, self.get_y())
+
+        self.set_font('Helvetica', 'B', 9)
+        self.set_x(x_start)
         for h, w in zip(header, col_widths):
-            self.cell(w, 7, self._fit_cell_text(str(h), w), border=1)
+            self.cell(w, 7.5, self._fit_cell_text(str(h), w), border=0)
         self.ln()
-        self.set_font('Helvetica', '', 8)
-        for row in rows:
+
+        self.set_line_width(0.25)
+        self.line(x_start, self.get_y(), x_start + table_width, self.get_y())
+
+        self.set_font('Helvetica', '', 9)
+        self.set_fill_color(242, 242, 242)
+        for i, row in enumerate(rows):
+            self.set_x(x_start)
+            fill = (i % 2 == 1)
             for value, w in zip(row, col_widths):
-                self.cell(w, 6, self._fit_cell_text(str(value), w), border=1)
+                self.cell(w, 6.5, self._fit_cell_text(str(value), w), border=0, fill=fill)
             self.ln()
 
-    def add_keyvalue_page(self, title, rows, label_width=45):
+        self.set_line_width(0.4)
+        self.line(x_start, self.get_y(), x_start + table_width, self.get_y())
+        self.ln(3)
+
+    def add_keyvalue_page(self, title, rows, label_width=45, intro=None):
         """A label/value list, one entry per line -- for QA/provenance
         fields whose values vary too much in length for add_table_page's
         fixed-width, truncate-if-too-long cells (a full file path or command
         line must stay intact, not get an ellipsis)."""
         self.add_page()
         self.section_title(title)
+        if intro:
+            self.add_intro_text(intro)
         for label, value in rows:
             value = str(value)
-            self.set_font('Helvetica', 'B', 9)
+            self.set_font('Helvetica', 'B', 10)
             self.set_x(self.l_margin)
-            self.cell(label_width, 6, f'{label}:', new_x='RIGHT', new_y='TOP')
+            self.cell(label_width, 6.5, f'{label}:', new_x='RIGHT', new_y='TOP')
             # A value with embedded newlines (e.g. the multi-line "Command
             # invoked") reads better as a monospaced block than justified
             # proportional text.
             if '\n' in value:
-                self.set_font('Courier', '', 8)
+                self.set_font('Courier', '', 8.5)
             else:
-                self.set_font('Helvetica', '', 9)
-            self.multi_cell(0, 6, value)
+                self.set_font('Helvetica', '', 10)
+            self.multi_cell(0, 6.5, value)
 
-    def add_figure_page(self, title, fig, width=180):
+    def add_figure_page(self, title, fig, width=180, intro=None):
         self.add_page()
         self.section_title(title)
+        if intro:
+            self.add_intro_text(intro)
         self.image(_fig_to_png_bytes(fig), w=width)
 
 
@@ -167,6 +249,54 @@ def _split_beta_stem(stem):
 # Already shown as their own rows on the "Run information" page -- excluded
 # from "Pipeline parameters" so the two pages don't just repeat each other.
 _PARAMETERS_SHOWN_ELSEWHERE = {'input', 'output', 'metadata', 'classifier', 'qiime2'}
+
+# One short explanatory paragraph per analysis section, printed under its
+# title -- what the analysis actually shows and how to read it, for a reader
+# who isn't already familiar with these specific QIIME2 outputs.
+_INTRO_DADA2 = (
+    'DADA2 denoises raw reads into exact amplicon sequence variants (ASVs) and removes chimeric '
+    'artifacts. This table shows what fraction of each sample\'s reads survived quality filtering, '
+    'denoising, merging (paired-end only), and chimera removal -- a sample retaining very few reads '
+    'at any step may need different DADA2 parameters, or exclusion from downstream analysis.'
+)
+_INTRO_ALPHA_TABLE = (
+    'Alpha diversity measures within-sample richness and evenness of taxa (Faith\'s phylogenetic '
+    'diversity, observed features, Shannon, and evenness). A Kruskal-Wallis test checks whether a '
+    'metric differs significantly between the groups of a metadata column; a low p-value '
+    '(conventionally < 0.05) indicates the groups differ.'
+)
+_INTRO_ALPHA_BOXPLOT = (
+    'Boxplots of each alpha diversity metric, split by the report\'s grouping column -- the same '
+    'comparison as the group-significance table, shown visually.'
+)
+_INTRO_BETA_TABLE = (
+    'Beta diversity compares community composition (not just richness) between samples. PERMANOVA '
+    'tests whether samples within the same metadata group are more similar to each other than to '
+    'samples in other groups, for both Bray-Curtis (abundance-weighted) and unweighted UniFrac '
+    '(phylogenetic presence/absence) distances.'
+)
+_INTRO_PCOA = (
+    'Principal coordinates analysis (PCoA) projects the pairwise distance matrix into two dimensions '
+    'for visualization; samples that cluster together have more similar community composition. The '
+    'percentage on each axis is the proportion of total variance it explains.'
+)
+_INTRO_GENUS = (
+    'Relative abundance of the most abundant genera in each sample, collapsed from the classifier\'s '
+    'taxonomic assignments. "Unclassified" covers features the classifier could not assign to a '
+    'genus; "Other" covers genera outside the most abundant ones shown individually.'
+)
+_INTRO_RAREFACTION = (
+    'Number of observed features (ASVs) as a function of sequencing depth, per sample. A curve that '
+    'plateaus indicates sequencing depth was sufficient to capture most of that sample\'s diversity; '
+    'one still rising steeply at the sampling depth used suggests deeper sequencing would likely '
+    'reveal more.'
+)
+_INTRO_CLASSIFIER = (
+    'Tests whether community composition alone can predict a sample\'s metadata category, using a '
+    'random-forest classifier. "Baseline accuracy" is what a naive classifier predicting only the '
+    'most common class would achieve; an "accuracy ratio" above 1 means community composition '
+    'carries real predictive signal for that column.'
+)
 
 
 def _run_info_rows(run_metadata):
@@ -238,12 +368,15 @@ def _alpha_boxplot_figure(alpha_results, report_column):
         labels = sorted(groups)
         data = [groups[label] for label in labels]
         if data:
-            ax.boxplot(data, tick_labels=labels)
+            bp = ax.boxplot(data, tick_labels=labels, patch_artist=True, medianprops={'color': 'black'})
+            for i, patch in enumerate(bp['boxes']):
+                patch.set_facecolor(_COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)])
+                patch.set_alpha(0.75)
         ax.set_title(metric)
         ax.tick_params(axis='x', rotation=45)
     for ax in flat_axes[n:]:
         ax.set_visible(False)
-    fig.suptitle(f'Alpha diversity by {report_column}')
+    fig.suptitle(f'Alpha diversity by {report_column}', fontsize=13)
     fig.tight_layout()
     return fig
 
@@ -251,17 +384,23 @@ def _alpha_boxplot_figure(alpha_results, report_column):
 def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_column, title):
     fig, ax = plt.subplots(figsize=(6, 5))
     groups = sorted({metadata_table.get(sid, {}).get(report_column, '?') for sid in sample_coords})
-    for group in groups:
+    for i, group in enumerate(groups):
         xs, ys = [], []
         for sid, (x, y) in sample_coords.items():
             if metadata_table.get(sid, {}).get(report_column, '?') == group:
                 xs.append(x)
                 ys.append(y)
-        ax.scatter(xs, ys, label=group)
+        color = _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)]
+        # Semi-transparent fill + a thin outline: overlapping points (common
+        # with pilot-scale sample counts) stay distinguishable from each
+        # other and from a solid single-point marker instead of merging
+        # into one opaque blob.
+        ax.scatter(xs, ys, label=group, color=color, alpha=0.7, s=55,
+                   edgecolors='black', linewidths=0.6)
     ax.set_xlabel(f'PC1 ({proportion_explained[0] * 100:.1f}%)')
     ax.set_ylabel(f'PC2 ({proportion_explained[1] * 100:.1f}%)')
     ax.set_title(title)
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=9, frameon=False)
     fig.tight_layout()
     return fig
 
@@ -280,21 +419,40 @@ def _fit_width_mm(fig, max_height_mm=230, max_width_mm=180):
     return min(max_width_mm, max_height_mm * fig_w_in / fig_h_in)
 
 
+def _genus_colors(index):
+    """One color per genus, cycling the colorblind palette -- except 'Other'
+    and 'Unclassified', which always get the same fixed neutral grey rather
+    than whatever color they'd land on next in the cycle."""
+    colors = []
+    next_color = 0
+    for label in index:
+        if label in ('Other', 'Unclassified'):
+            colors.append(_NEUTRAL_GREY)
+        else:
+            colors.append(_COLORBLIND_PALETTE[next_color % len(_COLORBLIND_PALETTE)])
+            next_color += 1
+    return colors
+
+
 def _genus_barplot_figure(genus_table):
     n_samples = len(genus_table.columns)
+    colors = _genus_colors(genus_table.index)
     if n_samples > _MANY_SAMPLES_THRESHOLD:
         # Horizontal bars (one row per sample) scale by adding figure
         # height, not width -- vertical bars for this many samples squeeze
         # every bar, and its sample label, down to an unreadable sliver.
         fig, ax = plt.subplots(figsize=(8, min(24, max(6, 0.3 * n_samples))))
-        genus_table.T.plot(kind='barh', stacked=True, ax=ax, legend=True)
+        genus_table.T.plot(kind='barh', stacked=True, ax=ax, legend=True, width=0.85, color=colors,
+                           edgecolor='white', linewidth=0.4)
         ax.set_xlabel('Relative abundance')
         ax.invert_yaxis()  # first sample at the top, matching reading order
     else:
         fig, ax = plt.subplots(figsize=(max(6, 0.6 * n_samples), 5))
-        genus_table.T.plot(kind='bar', stacked=True, ax=ax, legend=True)
+        genus_table.T.plot(kind='bar', stacked=True, ax=ax, legend=True, width=0.85, color=colors,
+                           edgecolor='white', linewidth=0.4)
         ax.set_ylabel('Relative abundance')
-    ax.legend(fontsize=7, bbox_to_anchor=(1.02, 1), loc='upper left')
+    ax.tick_params(axis='both', labelsize=10)
+    ax.legend(fontsize=10, bbox_to_anchor=(1.02, 1), loc='upper left', frameon=False)
     fig.tight_layout()
     return fig
 
@@ -302,19 +460,22 @@ def _genus_barplot_figure(genus_table):
 def _rarefaction_figure(curves, metric):
     # A one-line-per-sample legend easily runs to dozens of entries, which
     # dwarfed the actual plot (squeezed into a small corner) when this used
-    # a single wide-and-short figure. Taller and narrower, plus a 2-column
-    # legend past the sample-count threshold above, fixes both at once.
+    # a single wide-and-short figure. A taller figure, plus a 2-column
+    # legend past the sample-count threshold above, fixes both at once --
+    # but not too tall: (7, 11) read as excessively elongated in practice,
+    # so this is scaled back to roughly two-thirds of that height.
     many_samples = len(curves) > _MANY_SAMPLES_THRESHOLD
-    fig, ax = plt.subplots(figsize=(7, 11) if many_samples else (6, 5))
-    for sample_id, points in curves.items():
+    fig, ax = plt.subplots(figsize=(7, 7) if many_samples else (6, 5))
+    for i, (sample_id, points) in enumerate(curves.items()):
         if points:
+            color = _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)]
             ax.plot([p[0] for p in points], [p[1] for p in points], marker='o', markersize=3,
-                    label=sample_id)
+                    color=color, label=sample_id)
     ax.set_xlabel('Sequencing depth')
     ax.set_ylabel(metric)
     ax.set_title(f'Rarefaction curve ({metric})')
-    ax.legend(fontsize=6 if many_samples else 7, ncol=2 if many_samples else 1,
-              bbox_to_anchor=(1.02, 1), loc='upper left')
+    ax.legend(fontsize=8.5 if many_samples else 9, ncol=2 if many_samples else 1,
+              bbox_to_anchor=(1.02, 1), loc='upper left', frameon=False)
     fig.tight_layout()
     return fig
 
@@ -381,7 +542,7 @@ def build_report(output_folder, metadata_file, report_column=None):
     # 2. DADA2 retention table
     if dada2 is not None:
         _df, header, rows = dada2
-        pdf.add_table_page('DADA2 read retention', header, rows)
+        pdf.add_table_page('DADA2 read retention', header, rows, intro=_INTRO_DADA2)
 
     # 3. Alpha diversity: group-significance p-values + boxplots
     alpha_results = {}
@@ -395,11 +556,12 @@ def build_report(output_folder, metadata_file, report_column=None):
             for column, stats in by_column.items():
                 rows.append([metric, column, f'{stats["h_statistic"]:.3f}', f'{stats["p_value"]:.3f}'])
         pdf.add_table_page('Alpha diversity group significance (Kruskal-Wallis)',
-                            ['metric', 'metadata column', 'H', 'p-value'], rows)
+                            ['metric', 'metadata column', 'H', 'p-value'], rows, intro=_INTRO_ALPHA_TABLE)
 
         if report_column and any(report_column in by_column for by_column in alpha_results.values()):
             alpha_fig = _alpha_boxplot_figure(alpha_results, report_column)
-            pdf.add_figure_page('Alpha diversity by group', alpha_fig, width=_fit_width_mm(alpha_fig))
+            pdf.add_figure_page('Alpha diversity by group', alpha_fig, width=_fit_width_mm(alpha_fig),
+                                 intro=_INTRO_ALPHA_BOXPLOT)
 
     # 4. Beta diversity: PCoA + PERMANOVA
     beta_rows = []
@@ -411,7 +573,8 @@ def build_report(output_folder, metadata_file, report_column=None):
                            f'{stats["p_value"]:.3f}' if stats.get('p_value') is not None else ''])
     if beta_rows:
         pdf.add_table_page('Beta diversity group significance (PERMANOVA)',
-                            ['metadata column', 'distance metric', 'statistic', 'value', 'p-value'], beta_rows)
+                            ['metadata column', 'distance metric', 'statistic', 'value', 'p-value'], beta_rows,
+                            intro=_INTRO_BETA_TABLE)
 
     if report_column:
         for metric in ('bray_curtis', 'unweighted_unifrac'):
@@ -420,21 +583,23 @@ def build_report(output_folder, metadata_file, report_column=None):
                 sample_coords, proportion_explained = report_data.parse_ordination(ordination_path)
                 pdf.add_figure_page(f'{metric} PCoA', _pcoa_figure(
                     sample_coords, proportion_explained, metadata_table, report_column,
-                    f'{metric} (colored by {report_column})'))
+                    f'{metric} (colored by {report_column})'), intro=_INTRO_PCOA)
 
     # 5. Genus-level composition
     biom_taxo_path = output_folder / 'biom_table' / 'table-with-taxonomy.biom.tsv'
     if biom_taxo_path.exists():
         genus_table = report_data.build_genus_abundance_table(biom_taxo_path)
         genus_fig = _genus_barplot_figure(genus_table)
-        pdf.add_figure_page('Genus-level relative abundance', genus_fig, width=_fit_width_mm(genus_fig))
+        pdf.add_figure_page('Genus-level relative abundance', genus_fig, width=_fit_width_mm(genus_fig),
+                             intro=_INTRO_GENUS)
 
     # 6. Rarefaction curve
     rarefaction_qzv = output_folder / 'alpha-rarefaction.qzv'
     if rarefaction_qzv.exists():
         curves = report_data.parse_rarefaction_curve(rarefaction_qzv, 'observed_features')
         rarefaction_fig = _rarefaction_figure(curves, 'observed_features')
-        pdf.add_figure_page('Rarefaction curve', rarefaction_fig, width=_fit_width_mm(rarefaction_fig))
+        pdf.add_figure_page('Rarefaction curve', rarefaction_fig, width=_fit_width_mm(rarefaction_fig),
+                             intro=_INTRO_RAREFACTION)
 
     # 7. Sample classifier accuracy, if any
     classifier_rows = []
@@ -448,7 +613,7 @@ def build_report(output_folder, metadata_file, report_column=None):
                 classifier_rows.append([column, label, f'{accuracy[key]:.3f}'])
     if classifier_rows:
         pdf.add_table_page('Sample classifier results', ['metadata column', 'metric', 'value'],
-                            classifier_rows)
+                            classifier_rows, intro=_INTRO_CLASSIFIER)
 
     report_path = output_folder / 'report.pdf'
     pdf.output(str(report_path))

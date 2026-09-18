@@ -205,6 +205,19 @@ class TestFitWidthMm:
         plt.close(fig)
 
 
+class TestGenusColors:
+    def test_other_and_unclassified_always_get_the_fixed_neutral_grey(self):
+        colors = report._genus_colors(['Unclassified', 'Fusarium', 'Penicillium', 'Other'])
+        assert colors[0] == report._NEUTRAL_GREY
+        assert colors[3] == report._NEUTRAL_GREY
+
+    def test_named_genera_cycle_the_colorblind_palette_without_using_grey(self):
+        colors = report._genus_colors(['Unclassified', 'Fusarium', 'Penicillium', 'Other'])
+        assert colors[1] == report._COLORBLIND_PALETTE[0]
+        assert colors[2] == report._COLORBLIND_PALETTE[1]
+        assert report._NEUTRAL_GREY not in (colors[1], colors[2])
+
+
 class TestGenusBarplotFigure:
     def test_switches_to_horizontal_bars_past_the_sample_threshold(self):
         import pandas as pd
