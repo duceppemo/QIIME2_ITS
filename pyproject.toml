@@ -1,5 +1,12 @@
 [build-system]
-requires = ["setuptools>=68"]
+# >=77 (not the previous >=68): this file's PEP 639 license metadata below
+# (license = "MIT" as a plain string, plus license-files) only validates on
+# setuptools 77+ -- confirmed empirically, 76.1.0 fails the build outright
+# with "project.license must be valid exactly by one definition". Only bites
+# --no-build-isolation installs or an env with an older setuptools already
+# present; a normal `pip install` pulls a current setuptools into its build
+# environment regardless of this floor.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -21,6 +28,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [

@@ -19,7 +19,7 @@
 # --with-unite additionally downloads a real, current UNITE release (via the
 # `rescript` plugin, no bundled data -- see the README) and trains and
 # classifies with it. It's opt-in and not part of the default run: unlike the
-# four scenarios above (seconds, bundled ~100KB of data), it downloads tens of
+# six scenarios above (seconds, bundled ~100KB of data), it downloads tens of
 # MB from UNITE and the naive-Bayes fit on the full release can take an hour
 # or more of CPU time and several GB of RAM. UNITE data is CC BY-SA 4.0
 # (https://unite.ut.ee/cite.php), separate from the CC0/public-domain data

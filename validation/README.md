@@ -46,13 +46,14 @@ validation/run_validation.sh --with-unite
 ```
 
 Additionally downloads a real, current UNITE release via the `rescript` plugin
-(`qiime rescript get-unite-data`, bundled with QIIME2 -- see the main README's "From UNITE"
-section), repackages it into a real UNITE QIIME-release archive layout, and runs it through
-`qiime2-its-train-unite` and then `qiime2-its` itself, so the resulting classifier assigns real
-taxonomy to the bundled `single_end` reads.
+(`qiime rescript get-unite-data`, bundled with QIIME2 -- see the wiki's
+[Building a Classifier](https://github.com/duceppemo/QIIME2_ITS/wiki/Building-a-Classifier)
+page, "From UNITE" section), repackages it into a real UNITE QIIME-release archive layout, and
+runs it through `qiime2-its-train-unite` and then `qiime2-its` itself, so the resulting classifier
+assigns real taxonomy to the bundled `single_end` reads.
 
 This is **not** part of the default run and nothing from it is bundled in the repo (unlike the
-~100KB of data used by the four scenarios above):
+~100KB of data used by the six scenarios above):
 - it downloads tens of MB from UNITE at runtime (UNITE data is CC BY-SA 4.0, see
   https://unite.ut.ee/cite.php -- separate from the CC0/public-domain licensing of the data in
   `data/`)

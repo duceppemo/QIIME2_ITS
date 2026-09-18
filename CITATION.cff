@@ -14,8 +14,8 @@ authors:
 repository-code: "https://github.com/duceppemo/QIIME2_ITS"
 url: "https://github.com/duceppemo/QIIME2_ITS"
 license: MIT
-version: 0.2.1
-date-released: "2026-09-16"
+version: 0.3.0
+date-released: "2026-09-18"
 keywords:
   - bioinformatics
   - QIIME2

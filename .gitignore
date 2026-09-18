@@ -9,3 +9,4 @@ venv/
 build/
 dist/
 validation/output/
+.idea/

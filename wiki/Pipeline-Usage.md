@@ -72,9 +72,9 @@ qiime2-its \
 
 - **`--max-ee 4`** (up from the default 2.0): IonTorrent's higher raw error rate means the default
   threshold discards a large fraction of otherwise-usable reads before denoising ever sees them.
-  Treat 4 as a starting point, not a universal value — check the `denoising-stats.qzv` retention
-  numbers after a first run and raise further if too many reads are being dropped at the filtering
-  step specifically (as opposed to the denoising/chimera steps).
+  Treat 4 as a starting point, not a universal value — check the `stats.qzv` (or
+  `dada2_stats/stats.tsv`) retention numbers after a first run and raise further if too many reads
+  are being dropped at the filtering step specifically (as opposed to the denoising/chimera steps).
 - **`--allow-one-off`**: without it, a true ASV that differs from a more abundant parent by exactly
   one homopolymer-length indel — routine on IonTorrent — is *not* checked as a one-off bimera and so
   is more likely to survive as a spurious extra ASV. Turning it on makes the chimera search also
