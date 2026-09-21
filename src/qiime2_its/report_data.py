@@ -15,6 +15,7 @@ import csv
 import json
 import re
 import zipfile
+from urllib.parse import unquote
 
 import pandas as pd
 
@@ -50,7 +51,7 @@ def parse_sample_frequencies(sample_frequencies_tsv_path):
 def parse_dada2_stats(stats_tsv_path):
     """DADA2 denoising-stats.tsv export as a DataFrame indexed by sample-id,
     numeric columns coerced to numbers."""
-    df = pd.read_csv(stats_tsv_path, sep='\t')
+    df = pd.read_csv(stats_tsv_path, sep='\t', dtype={'sample-id': str})
     df = df[df['sample-id'] != '#q2:types']
     df = df.set_index('sample-id')
     for col in df.columns:
@@ -120,7 +121,9 @@ def parse_alpha_group_significance(qzv_path):
             match = re.search(r'/data/column-(.+)\.jsonp$', name)
             if not match:
                 continue
-            column = match.group(1)
+            # q2-diversity URL-quotes the column name for this file name
+            # ("Host Plant" -> column-Host%20Plant.jsonp, "/" -> %2F).
+            column = unquote(match.group(1))
             content = zf.read(name).decode('utf-8')
 
             stat_match = _ALPHA_STAT_RE.search(content)
@@ -255,7 +258,7 @@ def build_genus_abundance_table(biom_tsv_path, top_n=10):
     sample_cols = [c for c in df.columns if c != 'taxonomy']
 
     df = df.copy()
-    df['genus'] = df['taxonomy'].map(_genus_from_taxonomy)
+    df['genus'] = df['taxonomy'].fillna('').map(_genus_from_taxonomy)
     genus_table = df.groupby('genus')[sample_cols].sum()
 
     totals = genus_table.sum(axis=0)
@@ -307,8 +310,14 @@ def parse_taxonomy_confidence(taxonomy_tsv_path):
 def parse_distance_matrix(distance_matrix_tsv_path):
     """Square distance matrix export (e.g. bray_curtis_distance_matrix.qza,
     via `qiime tools export`) as a DataFrame indexed and columned by sample
-    id, in the same order as the file's own row/column order."""
-    return pd.read_csv(distance_matrix_tsv_path, sep='\t', index_col=0)
+    id, in the same order as the file's own row/column order.
+
+    Read as text first: left to infer types, pandas turns numeric-looking
+    sample ids in the index ("001", "12") into ints (1, 12), which then no
+    longer match the metadata's string ids -- every sample silently loses
+    its group in the dendrogram."""
+    df = pd.read_csv(distance_matrix_tsv_path, sep='\t', dtype=str, keep_default_na=False)
+    return df.set_index(df.columns[0]).rename_axis(None).astype(float)
 
 
 def parse_run_metadata(run_metadata_json_path):

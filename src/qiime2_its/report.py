@@ -268,6 +268,18 @@ _METRIC_DISPLAY_NAMES = {
 }
 
 
+def _real_column_names(metadata_file):
+    """{sanitized file-name component: real column name}. The pipeline
+    names beta-group-significance-<column>-<metric>.qzv and
+    sample-classifier-<column>/ after metadata_utils.
+    safe_filename_component(column), so a column like "Host Plant" comes
+    back from those paths as "Host_Plant" -- which matches nothing in the
+    metadata: every sample then lost its group on that column's PCoA/
+    dendrogram pages, and the tables showed the mangled name."""
+    return {metadata_utils.safe_filename_component(column): column
+            for column in metadata_utils.parse_metadata_columns(metadata_file)}
+
+
 def _split_beta_stem(stem):
     stem = stem.removeprefix('beta-group-significance-')
     for metric in _BETA_DISTANCE_METRICS:
@@ -424,7 +436,12 @@ def _dada2_summary_table(output_folder):
     return df, header, rows
 
 
-def _alpha_boxplot_figure(alpha_results, report_column):
+def _alpha_boxplot_figure(alpha_results, report_column, group_color=None):
+    """`group_color` ({group: color}, see _group_color_map) keeps each
+    group's box the same color as its PCoA dots/dendrogram labels; boxes
+    used to be colored by position among the groups present, which shifts
+    every color as soon as one group is absent from the alpha results."""
+    group_color = group_color or {}
     metrics = sorted(alpha_results)
     n = len(metrics)
     # A near-square grid (2x2 for the usual 4 metrics) instead of a single
@@ -449,7 +466,7 @@ def _alpha_boxplot_figure(alpha_results, report_column):
         if data:
             bp = ax.boxplot(data, tick_labels=labels, patch_artist=True, medianprops={'color': 'black'})
             for i, patch in enumerate(bp['boxes']):
-                patch.set_facecolor(_COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)])
+                patch.set_facecolor(group_color.get(labels[i], _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)]))
                 patch.set_alpha(0.75)
         ax.set_title(metric)
         ax.tick_params(axis='x', rotation=rotation)
@@ -460,6 +477,22 @@ def _alpha_boxplot_figure(alpha_results, report_column):
     return fig
 
 
+# Label for a sample with no value in the grouping column (or no metadata
+# row at all). Never in _group_color_map/_group_marker_map, so it always
+# takes their callers' neutral fallback (grey, plain circle) instead of
+# using up a palette color. An empty-string label would also be silently
+# dropped from the legend by matplotlib.
+_MISSING_GROUP = '(missing)'
+
+
+def _sample_group(metadata_table, sample_id, column):
+    return metadata_table.get(sample_id, {}).get(column) or _MISSING_GROUP
+
+
+def _column_groups(metadata_table, column):
+    return sorted({row.get(column) for row in metadata_table.values()} - {None, ''})
+
+
 def _group_color_map(metadata_table, report_column):
     """{group: color}, built once from every value of `report_column`
     across the *whole* metadata table -- not just one figure's own sample
@@ -468,7 +501,7 @@ def _group_color_map(metadata_table, report_column):
     that particular figure happens to plot."""
     if not report_column:
         return {}
-    groups = sorted({row.get(report_column, '?') for row in metadata_table.values()})
+    groups = _column_groups(metadata_table, report_column)
     return {group: _COLORBLIND_PALETTE[i % len(_COLORBLIND_PALETTE)] for i, group in enumerate(groups)}
 
 
@@ -489,7 +522,7 @@ def _group_marker_map(metadata_table, report_column):
     no marker-shape equivalent."""
     if not report_column:
         return {}
-    groups = sorted({row.get(report_column, '?') for row in metadata_table.values()})
+    groups = _column_groups(metadata_table, report_column)
     return {group: _MARKER_CYCLE[(i // len(_COLORBLIND_PALETTE)) % len(_MARKER_CYCLE)]
             for i, group in enumerate(groups)}
 
@@ -520,13 +553,13 @@ def _readable_text_color(hex_color):
 def _pcoa_figure(sample_coords, proportion_explained, metadata_table, report_column, title,
                   group_color=None, group_marker=None):
     fig, ax = plt.subplots(figsize=(6, 5))
-    groups = sorted({metadata_table.get(sid, {}).get(report_column, '?') for sid in sample_coords})
+    groups = sorted({_sample_group(metadata_table, sid, report_column) for sid in sample_coords})
     group_color = group_color if group_color is not None else _group_color_map(metadata_table, report_column)
     group_marker = group_marker if group_marker is not None else _group_marker_map(metadata_table, report_column)
     for group in groups:
         xs, ys = [], []
         for sid, (x, y) in sample_coords.items():
-            if metadata_table.get(sid, {}).get(report_column, '?') == group:
+            if _sample_group(metadata_table, sid, report_column) == group:
                 xs.append(x)
                 ys.append(y)
         color = group_color.get(group, '#666666')
@@ -576,7 +609,7 @@ def _dendrogram_figure(distance_df, metadata_table, report_column, title, group_
                color_threshold=0, above_threshold_color='#444444')
 
     if report_column:
-        groups = sorted({metadata_table.get(sid, {}).get(report_column, '?') for sid in sample_ids})
+        groups = sorted({_sample_group(metadata_table, sid, report_column) for sid in sample_ids})
         group_color = group_color if group_color is not None else _group_color_map(metadata_table, report_column)
         # Darkened for text/legend readability (some palette colors, e.g.
         # yellow, are too pale to read as small text even though they're
@@ -590,7 +623,7 @@ def _dendrogram_figure(distance_df, metadata_table, report_column, title, group_
         text_color = {group: _readable_text_color(group_color.get(group, '#666666')) for group in groups}
         tick_labels = ax.get_yticklabels() if orientation == 'left' else ax.get_xticklabels()
         for tick_label in tick_labels:
-            group = metadata_table.get(tick_label.get_text(), {}).get(report_column, '?')
+            group = _sample_group(metadata_table, tick_label.get_text(), report_column)
             tick_label.set_color(text_color.get(group, 'black'))
         handles = [Line2D([0], [0], color=text_color[group], lw=4, label=_wrap_legend_label(group))
                    for group in groups]
@@ -767,6 +800,8 @@ def build_report(output_folder, metadata_file, report_column=None):
     if report_column is None:
         report_column = eligible_columns[0] if eligible_columns else None
 
+    real_column = _real_column_names(metadata_file)
+
     pdf = _ReportPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
 
@@ -834,7 +869,8 @@ def build_report(output_folder, metadata_file, report_column=None):
         alpha_columns = sorted(set(alpha_significant) | ({report_column} if report_column else set()))
         for column in alpha_columns:
             if any(column in by_column for by_column in alpha_results.values()):
-                alpha_fig = _alpha_boxplot_figure(alpha_results, column)
+                alpha_fig = _alpha_boxplot_figure(alpha_results, column,
+                                                   group_color=_group_color_map(metadata_table, column))
                 intro = _INTRO_ALPHA_BOXPLOT + _significance_note(column, alpha_significant)
                 pdf.add_figure_page(f'Alpha diversity by {column}', alpha_fig, width=_fit_width_mm(alpha_fig),
                                      intro=intro)
@@ -845,6 +881,7 @@ def build_report(output_folder, metadata_file, report_column=None):
     for qzv_path in sorted(output_folder.glob('beta-group-significance-*.qzv')):
         stats = report_data.parse_beta_group_significance(qzv_path)
         column, metric = _split_beta_stem(qzv_path.stem)
+        column = real_column.get(column, column)
         beta_rows.append([column, metric, stats.get('test_statistic_name'),
                            f'{stats["test_statistic"]:.3f}' if stats.get('test_statistic') is not None else '',
                            f'{stats["p_value"]:.3f}' if stats.get('p_value') is not None else ''])
@@ -925,6 +962,7 @@ def build_report(output_folder, metadata_file, report_column=None):
     classifier_rows = []
     for accuracy_qzv in sorted(output_folder.glob('sample-classifier-*/accuracy_results.qzv')):
         column = accuracy_qzv.parent.name.removeprefix('sample-classifier-')
+        column = real_column.get(column, column)
         accuracy = report_data.parse_classifier_accuracy(accuracy_qzv)
         for key, label in (('overall_accuracy', 'Overall accuracy'),
                             ('baseline_accuracy', 'Baseline accuracy'),

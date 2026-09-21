@@ -95,6 +95,17 @@ def _write_alpha_group_significance_qzv(path, column_stats):
 
 
 class TestParseAlphaGroupSignificance:
+    def test_url_quoted_column_file_names_are_unquoted(self, tmp_path):
+        """q2-diversity names each file column-<quote(column)>.jsonp (and
+        additionally escapes "/" as %2F), so a column with a space used to
+        come back as "Host%20Plant"."""
+        qzv = tmp_path / 'alpha.qzv'
+        _write_alpha_group_significance_qzv(qzv, {
+            'Host%20Plant': (1.0, 0.5, {'oak (n=2)': [1.0, 2.0]}),
+            'site%2Fplot': (1.0, 0.5, {'a (n=2)': [1.0, 2.0]}),
+        })
+        assert set(report_data.parse_alpha_group_significance(qzv)) == {'Host Plant', 'site/plot'}
+
     def test_extracts_h_and_p_per_column(self, tmp_path):
         qzv = tmp_path / 'alpha.qzv'
         _write_alpha_group_significance_qzv(qzv, {
@@ -351,6 +362,17 @@ class TestParseDistanceMatrix:
         assert list(df.columns) == ['siteA', 'siteB', 'siteC']
         assert df.loc['siteA', 'siteB'] == 0.5
         assert df.loc['siteB', 'siteC'] == 0.3
+
+    def test_numeric_looking_sample_ids_stay_strings(self, tmp_path):
+        """Regression test: pandas' type inference turned "001"/"12" index
+        ids into ints, which no longer matched the metadata's string ids --
+        every sample lost its group in the dendrogram."""
+        path = tmp_path / 'distance-matrix.tsv'
+        path.write_text('\t001\t12\n001\t0.0\t0.5\n12\t0.5\t0.0\n')
+        df = report_data.parse_distance_matrix(path)
+        assert list(df.index) == ['001', '12']
+        assert list(df.columns) == ['001', '12']
+        assert df.loc['001', '12'] == 0.5
 
 
 class TestParseTaxonomyConfidence:

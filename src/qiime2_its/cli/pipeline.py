@@ -5,7 +5,6 @@ filter -> DADA2 denoise -> phylogeny -> diversity -> taxonomy -> barplot ->
 import argparse
 import getpass
 import platform
-import re
 import socket
 import subprocess
 import sys
@@ -18,17 +17,9 @@ from qiime2_its._version import __version__
 from qiime2_its.itsxpress_wrapper import TAXA_CODES
 
 
-def _safe_filename_component(text):
-    """Replace characters outside [A-Za-z0-9._-] with '_' for safe use as a
-    filesystem path component. QIIME2 doesn't restrict metadata column names
-    from containing '/' (or other characters with filesystem meaning), and
-    this pipeline builds output paths directly from the column name -- a
-    column like "site/plot" would otherwise be interpreted as a
-    subdirectory, and QIIME2's own writers don't create missing parent
-    directories for a single-artifact output, so it fails outright (a
-    crash, not silently writing outside the output folder, but a fragile
-    invariant to depend on regardless)."""
-    return re.sub(r'[^A-Za-z0-9._-]', '_', text)
+# Kept under its original private name here; shared with report.py (which
+# has to map these sanitized file-name components back to real column names).
+_safe_filename_component = metadata_utils.safe_filename_component
 
 
 class Pipeline:

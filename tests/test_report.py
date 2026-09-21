@@ -297,6 +297,24 @@ class TestPcoaFigure:
         assert colors_by_group['siteB'] == mcolors.to_rgba('#222222', alpha=0.7)
         plt.close(fig)
 
+    def test_sample_without_a_group_value_is_labelled_missing_in_neutral_grey(self):
+        """A sample with an empty value (or no metadata row) used to be
+        plotted under an empty-string label, which matplotlib silently
+        leaves out of the legend; it must not take a palette color either."""
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        sample_coords = {'sampleA': (0.1, 0.1), 'sampleB': (-0.1, -0.1), 'sampleC': (0.0, 0.2)}
+        metadata_table = {'sampleA': {'site': 'siteA'}, 'sampleB': {'site': ''}}  # sampleC: no row at all
+        fig = report._pcoa_figure(sample_coords, (0.5, 0.2), metadata_table, 'site', 'title')
+        ax = fig.axes[0]
+        legend_labels = [text.get_text() for text in ax.get_legend().get_texts()]
+        assert legend_labels == ['(missing)', 'siteA']
+        missing = next(coll for coll in ax.collections if coll.get_label() == '(missing)')
+        assert len(missing.get_offsets()) == 2
+        assert tuple(missing.get_facecolor()[0]) == mcolors.to_rgba('#666666', alpha=0.7)
+        assert report._group_color_map(metadata_table, 'site') == {'siteA': report._COLORBLIND_PALETTE[0]}
+        plt.close(fig)
+
     def test_axis_labels_use_the_matching_proportion_explained_value(self):
         """Regression-shaped coverage: PC1's label must show
         proportion_explained[0], PC2's proportion_explained[1] -- swapped
@@ -539,6 +557,20 @@ class TestConfidenceHistogramFigure:
 
 
 class TestAlphaBoxplotFigure:
+    def test_boxes_use_the_shared_group_colors_not_their_position(self):
+        """Regression test: boxes were colored by position among the groups
+        present in the alpha results, so a group missing there (all its
+        samples dropped at rarefaction) shifted every later group to a
+        different color than its PCoA dots/dendrogram labels."""
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        alpha_results = {'shannon': {'site': {'groups': {'siteB': [1, 2], 'siteC': [3, 4]}}}}
+        group_color = {'siteA': '#111111', 'siteB': '#222222', 'siteC': '#333333'}
+        fig = report._alpha_boxplot_figure(alpha_results, 'site', group_color=group_color)
+        face_colors = [tuple(patch.get_facecolor()) for patch in fig.axes[0].patches]
+        assert face_colors == [mcolors.to_rgba('#222222', alpha=0.75), mcolors.to_rgba('#333333', alpha=0.75)]
+        plt.close(fig)
+
     def test_four_metrics_form_a_2x2_grid_not_a_single_row(self):
         alpha_results = {
             metric: {'site': {'groups': {'siteA': [1, 2], 'siteB': [3, 4]}}}
@@ -681,6 +713,41 @@ class TestBuildReport:
                           'Rarefaction curve',
                           'Sample classifier results'):
             assert expected in titles, f'missing page: {expected!r}'
+
+    def test_column_names_sanitized_for_file_names_are_mapped_back(self, tmp_path, mocker):
+        """Regression test: the pipeline names its per-column outputs after
+        safe_filename_component(column), and q2-diversity URL-quotes the
+        column in its alpha jsonp file names, so "Host Plant" came back as
+        "Host_Plant" / "Host%20Plant" -- matching nothing in the metadata
+        (every sample lost its group) and printed mangled in the tables."""
+        output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)
+        metadata_path.write_text(
+            'sample-id\tsite\tHost Plant\n#q2:types\tcategorical\tcategorical\n'
+            'sampleA\tsiteA\toak\nsampleB\tsiteA\tpine\nsampleC\tsiteB\toak\nsampleD\tsiteB\tpine\n')
+        _write_beta_qzv(output_folder / 'beta-group-significance-Host_Plant-bray_curtis.qzv', {
+            'method name': 'PERMANOVA', 'test statistic name': 'pseudo-F',
+            'sample size': '4', 'number of groups': '2', 'test statistic': '9.5', 'p-value': '0.01',
+        })
+        _write_alpha_qzv(output_folder / 'alpha-group-significance-shannon.qzv', {
+            'Host%20Plant': (5.0, 0.01, {'oak (n=2)': [0.9, 1.5], 'pine (n=2)': [2.2, 2.3]}),
+        })
+        (output_folder / 'sample-classifier-Host_Plant').mkdir()
+        _write_classifier_qzv(output_folder / 'sample-classifier-Host_Plant' / 'accuracy_results.qzv',
+                               'Overall Accuracy\t\t\t0.75\n')
+        titles = _page_titles(mocker)
+        tables = mocker.spy(report._ReportPDF, 'add_table_page')
+        pcoa = mocker.spy(report, '_pcoa_figure')
+
+        report.build_report(output_folder, metadata_path)
+
+        assert 'Host Plant: Bray-Curtis PCoA' in titles
+        assert 'Alpha diversity by Host Plant' in titles
+        assert not any('Host_Plant' in title or 'Host%20Plant' in title for title in titles)
+        host_plant_calls = [call for call in pcoa.call_args_list if call.args[3] == 'Host Plant']
+        assert host_plant_calls and host_plant_calls[0].kwargs['group_color'].keys() == {'oak', 'pine'}
+        table_cells = {str(cell) for call in tables.call_args_list for row in call.args[3] for cell in row}
+        assert 'Host Plant' in table_cells
+        assert 'Host_Plant' not in table_cells and 'Host%20Plant' not in table_cells
 
     def test_auto_picks_first_eligible_column_when_not_specified(self, tmp_path, mocker):
         output_folder, metadata_path = _build_synthetic_output_folder(tmp_path)

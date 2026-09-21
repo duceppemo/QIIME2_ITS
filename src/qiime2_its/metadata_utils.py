@@ -7,11 +7,25 @@ needing the qiime2 Python API (which would tie this module to running inside
 an activated QIIME2 environment just to be imported).
 """
 import csv
+import re
 from collections import defaultdict
 
 # Legacy ID-column headers QIIME2 accepts that start with "#" -- every other
 # "#"-prefixed line is a comment (or a "#q2:" directive).
 _HASH_ID_HEADERS = {'#SampleID', '#Sample ID', '#OTUID', '#OTU ID'}
+
+
+def safe_filename_component(text):
+    """Replace characters outside [A-Za-z0-9._-] with '_' for safe use as a
+    filesystem path component. QIIME2 doesn't restrict metadata column names
+    from containing '/' (or other characters with filesystem meaning), and
+    the pipeline builds output paths directly from the column name -- a
+    column like "site/plot" would otherwise be interpreted as a
+    subdirectory, and QIIME2's own writers don't create missing parent
+    directories for a single-artifact output, so it fails outright (a
+    crash, not silently writing outside the output folder, but a fragile
+    invariant to depend on regardless)."""
+    return re.sub(r'[^A-Za-z0-9._-]', '_', text)
 
 
 def _is_numeric(value):
