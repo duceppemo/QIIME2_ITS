@@ -372,6 +372,27 @@ class Pipeline:
         if not self.fastq_list:
             raise ValueError('No fastq files found in the provided input folder.')
 
+        # The fastq search is recursive, but QIIME2's Casava importer refuses
+        # an input folder that contains any subfolder ("Contains a
+        # subdirectory: ..."). An output folder nested inside the input
+        # folder therefore breaks the import (it's created before importing),
+        # and on a re-run its exported_reads/, rc_reads/ etc. would be
+        # picked up as extra input samples.
+        input_resolved = self.input_folder.resolve()
+        output_resolved = self.output_folder.resolve()
+        if output_resolved == input_resolved or input_resolved in output_resolved.parents:
+            raise ValueError(f'The output folder ({self.output_folder}) must not be the input folder or inside '
+                             f'it ({self.input_folder}) -- choose an output folder elsewhere.')
+        if not self.reverse_complement:
+            # (-rc writes flat copies of every file to its own folder first,
+            # so subfolders are fine there.)
+            nested = sorted(str(fq) for fq in self.fastq_list if Path(fq).resolve().parent != input_resolved)
+            if nested:
+                raise ValueError(
+                    'QIIME2 imports fastq files from the top level of the input folder only, but these are in '
+                    'subfolders: {}. Move (or symlink) every fastq file directly into {}.'.format(
+                        ', '.join(nested), self.input_folder))
+
         # Neither file is touched until after DADA2 (the metadata) or after
         # phylogeny + diversity (the classifier) -- a typo in either path
         # otherwise only surfaces hours into a real run.

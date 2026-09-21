@@ -11,6 +11,13 @@ def test_raises_if_output_equals_input(tmp_path):
         fastq_rc.run(tmp_path, tmp_path, threads=1)
 
 
+def test_raises_if_output_is_inside_input(tmp_path):
+    """The fastq search is recursive: a nested output folder's files would
+    be found (and re-processed) as input on the next run."""
+    with pytest.raises(ValueError, match='not inside'):
+        fastq_rc.run(tmp_path, tmp_path / 'rc', threads=1)
+
+
 def test_raises_if_input_missing(tmp_path):
     with pytest.raises(ValueError):
         fastq_rc.run(tmp_path / 'does-not-exist', tmp_path / 'out', threads=1)

@@ -109,6 +109,9 @@ qiime2-its-train-fasta \
     -i acc2taxid_table.tsv \
     -o /path/to/output_folder/
 ```
+Every sequence ID in the fasta file must be in the table; this is checked before anything is
+downloaded or imported, and the missing IDs are listed. Several sequences can share a taxid (the
+usual case: many reference sequences per species) -- each one gets its own taxonomy line.
 
 ## Other databases (not for ITS)
 

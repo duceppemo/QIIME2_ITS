@@ -13,8 +13,10 @@ def run(input_folder, output_folder, threads):
 
     if not input_folder.exists() or not input_folder.is_dir():
         raise ValueError('Input folder does not exist or is not a directory.')
-    if output_folder == input_folder:
-        raise ValueError('Please choose an output folder different from the input folder.')
+    # Not inside it either: the fastq search below is recursive, so a second
+    # run would find (and try to re-process) the first run's own output.
+    if output_folder.resolve() == input_folder.resolve() or input_folder.resolve() in output_folder.resolve().parents:
+        raise ValueError('Please choose an output folder different from (and not inside) the input folder.')
     output_folder.mkdir(parents=True, exist_ok=True)
 
     fastq_list = fastq_utils.list_fastq(input_folder)
@@ -32,7 +34,7 @@ def build_parser():
                          help='Input folder with fastq file(s), gzipped or not. Accepted extensions are '
                               '".fastq", ".fastq.gz", ".fq" and ".fq.gz". Searched recursively. Mandatory.')
     parser.add_argument('-o', '--output', metavar='/modified_fastq/', required=True, type=str,
-                         help='Output folder. Must be different from the input folder. Mandatory.')
+                         help='Output folder. Must be different from (and not inside) the input folder. Mandatory.')
     parser.add_argument('-t', '--threads', metavar=str(cpu), default=cpu, type=int,
                          help=f'Number of CPUs. Default is {cpu}.')
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')

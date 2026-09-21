@@ -90,7 +90,7 @@ def _make_pipeline(mocker, tmp_path, **overrides):
     argv = REQUIRED + ['-se']
     args = parser.parse_args(argv)
     args.input = str(tmp_path)
-    args.output = str(tmp_path / 'out')
+    args.output = str(tmp_path.parent / (tmp_path.name + '_out'))
     # Real files: checks() verifies both exist and that every fastq sample
     # has a metadata row.
     metadata = tmp_path / 'meta.tsv'
@@ -148,7 +148,7 @@ class TestPipelineChecks:
         ThreadPoolExecutor worker instead of a clear message here."""
         monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
         mocker.patch('qiime2_its.env_checks.shutil.which', return_value='/usr/bin/bbduk.sh')
-        pipeline = _make_pipeline(mocker, tmp_path, min_len=100, output=str(tmp_path / 'run=2' / 'out'))
+        pipeline = _make_pipeline(mocker, tmp_path, min_len=100, output=str(tmp_path.parent / 'run=2' / 'out'))
 
         with pytest.raises(ValueError, match='run=2'):
             pipeline.checks()
@@ -245,6 +245,31 @@ class TestPipelineChecks:
 
         with pytest.raises(ValueError, match=f'{label} file does not exist'):
             pipeline.checks()
+
+    def test_output_folder_inside_the_input_folder_rejected(self, mocker, tmp_path, monkeypatch):
+        """QIIME2's Casava importer refuses an input folder containing any
+        subfolder, and a nested output folder's exported_reads/ would be
+        picked up as input on a re-run."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path, output=str(tmp_path / 'qiime2_out'))
+
+        with pytest.raises(ValueError, match='must not be the input folder or inside'):
+            pipeline.checks()
+
+    def test_fastq_in_a_subfolder_rejected_unless_reverse_complementing(self, mocker, tmp_path, monkeypatch):
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path)
+        nested = tmp_path / 'run1' / 'siteC-rep3_S7_L001_R1_001.fastq.gz'
+        nested.parent.mkdir()
+        with gzip.open(nested, 'wt') as f:
+            f.write('@r1\nACGT\n+\nIIII\n')
+        pipeline.fastq_list.append(nested)
+
+        with pytest.raises(ValueError, match='run1'):
+            pipeline.checks()
+
+        pipeline.reverse_complement = True
+        pipeline.checks()  # -rc flattens every file into rc_reads/ first
 
     def test_sample_missing_from_metadata_rejected_up_front(self, mocker, tmp_path, monkeypatch):
         """QIIME2 refuses a feature table with sample IDs absent from the
