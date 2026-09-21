@@ -72,10 +72,45 @@ class TestReadMetadataRows:
         assert metadata_utils.read_metadata_table(path) == {'sampleA': {'site': 'siteA'}}
         assert metadata_utils.parse_metadata_columns(path) == {'site': 'categorical'}
 
-    def test_legacy_hash_id_header_is_the_header_not_a_comment(self, tmp_path):
+    @pytest.mark.parametrize('id_header', ['#SampleID', '#Sample ID', '#OTUID', '#OTU ID'])
+    def test_legacy_hash_id_header_is_the_header_not_a_comment(self, tmp_path, id_header):
         path = tmp_path / 'metadata.tsv'
-        path.write_text('#SampleID\tsite\nsampleA\tsiteA\n')
+        path.write_text(f'{id_header}\tsite\nsampleA\tsiteA\n')
         assert metadata_utils.read_metadata_table(path) == {'sampleA': {'site': 'siteA'}}
+
+    def test_bom_before_a_leading_comment_row(self, tmp_path):
+        """Regression test: a UTF-8 BOM hid the comment's "#", so the
+        comment row became the header and every real column vanished."""
+        path = tmp_path / 'metadata.tsv'
+        path.write_bytes('\ufeff# from Excel\nsample-id\tsite\nsampleA\tsiteA\n'.encode('utf-8'))
+        assert metadata_utils.read_metadata_table(path) == {'sampleA': {'site': 'siteA'}}
+
+    def test_q2_missing_directive_terms_are_missing_values(self, tmp_path):
+        """Regression test: with "#q2:missing INSDC:missing", QIIME2 reads
+        "not applicable" etc. as missing. Counting them as a group made a
+        one-real-group column "eligible", and beta-group-significance then
+        failed on it ("All values in the grouping vector are the same")."""
+        path = tmp_path / 'metadata.tsv'
+        path.write_text(
+            'sample-id\tgrp\tnote\n#q2:types\tcategorical\tcategorical\n#q2:missing\tINSDC:missing\tblank\n'
+            's1\ta\tnot applicable\ns2\ta\tx\ns3\tnot applicable\tx\ns4\tnot collected\tnot applicable\n')
+        ids = ['s1', 's2', 's3', 's4']
+        assert metadata_utils.class_sizes(path, 'grp', ids) == {'a': 2}
+        assert 'grp' not in metadata_utils.eligible_categorical_columns(path, ids)
+        # the "blank" scheme column keeps the same words as ordinary values
+        assert metadata_utils.class_sizes(path, 'note', ids) == {'not applicable': 2, 'x': 2}
+
+    @pytest.mark.parametrize('content, what', [
+        ('sample-id\tsite\tsite\ns1\tA\tB\n', 'column names: site'),
+        ('sample-id\tsite\ns1\tA\ns1\tB\n', 'sample ids: s1'),
+    ])
+    def test_duplicates_qiime2_would_reject_are_rejected_here_too(self, tmp_path, content, what):
+        """QIIME2 refuses both, but only after DADA2; silently keeping the
+        last one here let the up-front checks wave the file through."""
+        path = tmp_path / 'metadata.tsv'
+        path.write_text(content)
+        with pytest.raises(ValueError, match=f'duplicated {what}'):
+            metadata_utils.read_metadata_table(path)
 
     def test_cells_are_stripped_and_quotes_honored(self, tmp_path):
         path = tmp_path / 'metadata.tsv'

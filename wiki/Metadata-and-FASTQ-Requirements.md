@@ -8,11 +8,13 @@ Use a validated QIIME2 metadata TSV file. Validate it with
 Sample identifiers in the metadata file must **exactly match** the sample identifier field in the
 fastq file names (see below). `qiime2-its` checks upfront that the metadata file and the classifier
 exist and that every fastq sample has a row in the metadata file (extra metadata rows are fine) --
-QIIME2 itself would only report any of these after DADA2 has already run.
+QIIME2 itself would only report any of these after DADA2 has already run. Duplicated sample ids or
+column names are rejected at the same point.
 
 For the diversity statistics and the PDF report, the metadata file is read with QIIME2's own rules:
 rows starting with `#` are comments, a `#q2:types` row is honored, and an empty cell is a missing
-value -- samples with a missing value don't count toward a column's groups, and show up as
+value (as are the terms a `#q2:missing` row declares, e.g. `not applicable` under `INSDC:missing`)
+-- samples with a missing value don't count toward a column's groups, and show up as
 "(missing)" in the report's plots.
 
 ## FASTQ naming
@@ -39,7 +41,7 @@ doing any work.
 
 All fastq files must sit directly in the input folder (QIIME2's importer rejects an input folder
 containing subfolders; only `-rc` runs accept them, since they first write flat reverse-complemented
-copies), and the output folder must not be the input folder or inside it. Both are checked upfront.
+copies) -- symlinks to fastq files stored elsewhere are fine -- and the output folder must not be the input folder or inside it. Both are checked upfront.
 
 Your samples must already be demultiplexed: one fastq file (or one pair, for paired-end) per
 sample. A sample with a genuinely empty (zero-read) fastq file is also rejected upfront, by name,

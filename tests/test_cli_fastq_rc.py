@@ -7,7 +7,9 @@ from qiime2_its.cli import fastq_rc
 
 
 def test_raises_if_output_equals_input(tmp_path):
-    with pytest.raises(ValueError):
+    # match=: a bare ValueError also comes from "no fastq files found",
+    # which let the equality half of this check be deleted unnoticed.
+    with pytest.raises(ValueError, match='different from'):
         fastq_rc.run(tmp_path, tmp_path, threads=1)
 
 

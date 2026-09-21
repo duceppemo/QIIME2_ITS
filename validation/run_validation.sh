@@ -30,13 +30,23 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA="$HERE/data"
 WITH_UNITE=false
 OUT=""
+usage () {
+    echo "Usage: validation/run_validation.sh [--with-unite] [output_dir]" >&2
+    exit 2
+}
 for arg in "$@"; do
     case "$arg" in
         --with-unite) WITH_UNITE=true ;;
-        *) OUT="$arg" ;;
+        -*) echo "Unknown option: $arg" >&2; usage ;;
+        *) [ -z "$OUT" ] || { echo "More than one output_dir given: $OUT, $arg" >&2; usage; }
+           OUT="$arg" ;;
     esac
 done
-OUT="${OUT:-$HERE/output}"
+DEFAULT_OUT="$HERE/output"
+OUT="${OUT:-$DEFAULT_OUT}"
+# Written into every output dir this script creates: the only kind of
+# existing, non-empty directory (besides the default one) it agrees to wipe.
+SENTINEL=".qiime2_its_validation_output"
 
 command -v qiime2-its >/dev/null || {
     echo "qiime2-its not found on PATH. Activate your QIIME2 conda env and run" \
@@ -67,8 +77,59 @@ echo "itsxpress  : $(qiime itsxpress --version 2>&1 | head -1)"
 echo "output dir : $OUT"
 echo
 
-rm -rf "$OUT"
+# output_dir is wiped on every run -- but never a directory this script didn't
+# create itself: a mistyped path (~/results, validation/data, a typo'd
+# "with-unite") used to be deleted without a question.
+if [ -e "$OUT" ] && [ "$OUT" != "$DEFAULT_OUT" ] && [ ! -e "$OUT/$SENTINEL" ] \
+        && { [ ! -d "$OUT" ] || [ -n "$(ls -A "$OUT")" ]; }; then
+    echo "Refusing to delete $OUT: it exists, is not empty, and was not created by this script" \
+         "(no $SENTINEL file in it). Choose another output_dir or remove it yourself." >&2
+    exit 1
+fi
+rm -rf -- "$OUT"
 mkdir -p "$OUT"
+touch "$OUT/$SENTINEL"
+
+# Exit codes alone have already let wrong output through twice (an
+# all-"unidentified" taxonomy; classifiers trained on 4 of 20 reference
+# sequences) -- every scenario's *output* is checked too.
+check () {
+    local description="$1"; shift
+    if "$@"; then
+        echo "  ok: $description"
+    else
+        echo "VALIDATION FAILED: $description" >&2
+        exit 1
+    fi
+}
+one_taxonomy_line_per_sequence () {
+    local n_seqs n_lines
+    n_seqs="$(grep -c '^>' "$1")"
+    n_lines="$(wc -l < "$2")"
+    [ "$n_seqs" -gt 0 ] && [ "$n_seqs" -eq "$n_lines" ]
+}
+every_asv_classified_to_a_fungal_genus () {
+    # The bundled reads all come from the genera the toy classifiers are
+    # trained on, so anything short of k__Fungi...g__<Genus> on every ASV
+    # means taxonomy building or training regressed.
+    local tsv="$1/biom_table/taxonomy.tsv" total resolved
+    total="$(($(wc -l < "$tsv") - 1))"
+    resolved="$(grep -c 'k__Fungi.*g__[A-Z]' "$tsv" || true)"
+    [ "$total" -gt 0 ] && [ "$resolved" -eq "$total" ]
+}
+any_fungal_asv () {
+    grep -q 'k__Fungi' "$1/biom_table/taxonomy.tsv"
+}
+any_file_matches () {
+    compgen -G "$1" >/dev/null
+}
+check_pipeline_output () {
+    local dir="$1"
+    check "$dir: report.pdf written" test -s "$dir/report.pdf"
+    check "$dir: run_metadata.json written" test -s "$dir/run_metadata.json"
+    check "$dir: taxonomy (${TAXONOMY_CHECK:-every_asv_classified_to_a_fungal_genus})" \
+        "${TAXONOMY_CHECK:-every_asv_classified_to_a_fungal_genus}" "$dir"
+}
 
 echo "== Training a small real classifier (NCBI RefSeq fungal ITS accessions) =="
 qiime2-its-train-ncbi \
@@ -80,6 +141,8 @@ qiime2-its-train-ncbi \
     2>&1 | tee "$OUT/train_ncbi.log"
 
 CLASSIFIER="$OUT/classifier/seq_ncbi.qza"
+check "train_ncbi: one taxonomy line per downloaded sequence" \
+    one_taxonomy_line_per_sequence "$OUT/classifier/seq.fasta" "$OUT/classifier/taxonomy.txt"
 
 echo
 echo "== Training a classifier from a fasta + id-table (train_fasta) =="
@@ -87,12 +150,16 @@ qiime2-its-train-fasta \
     -q "$DATA/classifier_training/seqs.fasta" \
     -i "$DATA/classifier_training/id_table.tsv" \
     -o "$OUT/classifier_fasta" \
+    --taxdump "$OUT/classifier/taxdump.tar.gz" \
     2>&1 | tee "$OUT/train_fasta.log"
+check "train_fasta: one taxonomy line per input sequence" \
+    one_taxonomy_line_per_sequence "$DATA/classifier_training/seqs.fasta" "$OUT/classifier_fasta/taxonomy.txt"
 
 METADATA="$DATA/metadata.tsv"
 
+# run_case <name> <output_dir> <qiime2-its arguments...>
 run_case () {
-    local name="$1"; shift
+    local name="$1" case_out="$2"; shift 2
     echo
     echo "== $name =="
     qiime2-its \
@@ -100,28 +167,30 @@ run_case () {
         -m "$METADATA" \
         -c "$CLASSIFIER" \
         -t 4 -p 2 \
+        -o "$case_out" \
         "$@" \
         2>&1 | tee "$OUT/$name.log"
+    check_pipeline_output "$case_out"
 }
 
-run_case paired_end \
-    -i "$DATA/paired_end" -o "$OUT/paired_end" -pe --extract-its2 --taxa Fungi \
+run_case paired_end "$OUT/paired_end" \
+    -i "$DATA/paired_end" -pe --extract-its2 --taxa Fungi \
     --sampling-depth 10 --max-rarefaction-depth 60
 
-run_case single_end \
-    -i "$DATA/single_end" -o "$OUT/single_end" -se --extract-its2 --taxa Fungi \
+run_case single_end "$OUT/single_end" \
+    -i "$DATA/single_end" -se --extract-its2 --taxa Fungi \
     --max-ee 4 --allow-one-off --sampling-depth 10 --max-rarefaction-depth 60
 
-run_case paired_end_size_filter \
-    -i "$DATA/paired_end" -o "$OUT/paired_end_size_filter" -pe --extract-its2 --taxa Fungi \
+run_case paired_end_size_filter "$OUT/paired_end_size_filter" \
+    -i "$DATA/paired_end" -pe --extract-its2 --taxa Fungi \
     --min-len 120 --max-len 155 --sampling-depth 5 --max-rarefaction-depth 30
 
 # No --extract-its2 here: these ITS3-primed reads are already correctly
 # oriented, so reverse-complementing them makes ITSxpress's HMM search fail to
 # find ITS boundaries. -rc is validated in isolation (import -> DADA2) rather
 # than combined with ITS extraction.
-run_case single_end_reverse_complement \
-    -i "$DATA/single_end" -o "$OUT/single_end_reverse_complement" -se -rc --taxa Fungi \
+run_case single_end_reverse_complement "$OUT/single_end_reverse_complement" \
+    -i "$DATA/single_end" -se -rc --taxa Fungi \
     --max-ee 4 --sampling-depth 5 --max-rarefaction-depth 30
 
 # Swap in the fasta-trained classifier for this one case, to confirm it
@@ -129,8 +198,8 @@ run_case single_end_reverse_complement \
 # the NCBI one for anything run afterward.
 saved_classifier="$CLASSIFIER"
 CLASSIFIER="$OUT/classifier_fasta/naive-bayes_classifier.qza"
-run_case fasta_classifier_classification \
-    -i "$DATA/single_end" -o "$OUT/fasta_classifier_pipeline" -se --extract-its2 --taxa Fungi \
+run_case fasta_classifier_classification "$OUT/fasta_classifier_pipeline" \
+    -i "$DATA/single_end" -se --extract-its2 --taxa Fungi \
     --max-ee 4 --allow-one-off --sampling-depth 10 --max-rarefaction-depth 60
 CLASSIFIER="$saved_classifier"
 
@@ -141,10 +210,14 @@ CLASSIFIER="$saved_classifier"
 # 1-column metadata.tsv used above.
 saved_metadata="$METADATA"
 METADATA="$DATA/metadata_multi.tsv"
-run_case multi_sample_advanced_stats \
-    -i "$DATA/multi_sample" -o "$OUT/multi_sample_advanced_stats" -pe --extract-its2 --taxa Fungi \
+run_case multi_sample_advanced_stats "$OUT/multi_sample_advanced_stats" \
+    -i "$DATA/multi_sample" -pe --extract-its2 --taxa Fungi \
     --sampling-depth 10 --max-rarefaction-depth 15
 METADATA="$saved_metadata"
+check "multi_sample_advanced_stats: beta group-significance results written" \
+    any_file_matches "$OUT/multi_sample_advanced_stats/beta-group-significance-*.qzv"
+check "multi_sample_advanced_stats: alpha group-significance results written" \
+    any_file_matches "$OUT/multi_sample_advanced_stats/alpha-group-significance-*.qzv"
 
 run_unite_scenario () {
     # UNITE's own site now gates release files behind DOI/PlutoF landing
@@ -155,7 +228,9 @@ run_unite_scenario () {
     # extraction/file-matching/training code (not just rescript).
     local version="${UNITE_VERSION:-2025-02-19}"
     local taxon_group="${UNITE_TAXON_GROUP:-fungi}"
-    local cluster_id="${UNITE_CLUSTER_ID:-99}"
+    # Fixed, not overridable: qiime2-its-train-unite only picks up the 99%
+    # files from a UNITE archive.
+    local cluster_id="99"
     local yyyy mm dd release_date
     IFS='-' read -r yyyy mm dd <<< "$version"
     release_date="${dd}.${mm}.${yyyy}"
@@ -201,8 +276,10 @@ run_unite_scenario () {
     local saved_classifier="$CLASSIFIER"
     CLASSIFIER="$(find "$OUT/unite_classifier" -maxdepth 1 -name 'unite-*-classifier-*.qza' | head -1)"
 
-    run_case unite_classification \
-        -i "$DATA/single_end" -o "$OUT/unite_pipeline" -se --extract-its2 --taxa Fungi \
+    # A real, full-size reference database legitimately leaves some ASVs
+    # short of genus -- only require that classification produced fungi.
+    TAXONOMY_CHECK=any_fungal_asv run_case unite_classification "$OUT/unite_pipeline" \
+        -i "$DATA/single_end" -se --extract-its2 --taxa Fungi \
         --max-ee 4 --allow-one-off --sampling-depth 10 --max-rarefaction-depth 60
 
     CLASSIFIER="$saved_classifier"

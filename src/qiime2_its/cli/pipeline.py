@@ -238,9 +238,18 @@ class Pipeline:
             for metric in ('bray_curtis', 'unweighted_unifrac'):
                 distance_qza = core_metrics_dir / f'{metric}_distance_matrix.qza'
                 if distance_qza.exists():
-                    qiime_wrapper.beta_group_significance(
-                        distance_qza, self.metadata_file, column,  # raw column name -- must match the metadata file
-                        self.output_folder / f'beta-group-significance-{safe_column}-{metric}.qzv')
+                    # Same best-effort contract as the sample classifiers
+                    # below: eligibility is computed here from the metadata
+                    # file, QIIME2 decides for itself (e.g. after dropping
+                    # samples below the sampling depth) -- one column it
+                    # refuses must not abort a run this far in.
+                    try:
+                        qiime_wrapper.beta_group_significance(
+                            distance_qza, self.metadata_file, column,  # raw name -- must match the metadata file
+                            self.output_folder / f'beta-group-significance-{safe_column}-{metric}.qzv')
+                    except subprocess.CalledProcessError:
+                        print(f'\tSkipping {metric} group significance for "{column}": the test failed '
+                              f'(see the QIIME2 error above).')
 
         print('Exporting PCoA ordinations and distance matrices...')
         for metric in ('bray_curtis', 'unweighted_unifrac'):
@@ -386,7 +395,12 @@ class Pipeline:
         if not self.reverse_complement:
             # (-rc writes flat copies of every file to its own folder first,
             # so subfolders are fine there.)
-            nested = sorted(str(fq) for fq in self.fastq_list if Path(fq).resolve().parent != input_resolved)
+            # Only the *folder* is resolved, never the file itself: an input
+            # folder of symlinks to fastq files stored elsewhere is a common
+            # layout (and what the message below recommends) that QIIME2
+            # imports fine -- resolving the file would follow its symlink
+            # and report its storage folder as a "subfolder".
+            nested = sorted(str(fq) for fq in self.fastq_list if Path(fq).parent.resolve() != input_resolved)
             if nested:
                 raise ValueError(
                     'QIIME2 imports fastq files from the top level of the input folder only, but these are in '
@@ -435,6 +449,19 @@ class Pipeline:
                 'The following sample(s) have fastq files but no row in the metadata file {}: {}. Sample '
                 'IDs are the part of each fastq file name before the first "_".'.format(
                     self.metadata_file, ', '.join(missing_from_metadata)))
+
+        # Per-column outputs are named after safe_filename_component(column);
+        # two columns sharing one sanitized name ("Host Plant"/"Host_Plant")
+        # would overwrite each other's results and be indistinguishable to
+        # the report.
+        by_safe_name = {}
+        for column in metadata_utils.parse_metadata_columns(self.metadata_file):
+            by_safe_name.setdefault(_safe_filename_component(column), []).append(column)
+        collisions = [' / '.join(f'"{c}"' for c in cols) for cols in by_safe_name.values() if len(cols) > 1]
+        if collisions:
+            raise ValueError('These metadata columns become the same name once characters outside '
+                             '[A-Za-z0-9._-] are replaced by "_" for output file names -- rename one of '
+                             'each: {}'.format('; '.join(collisions)))
 
         # Stashed on self (not just a local) so _write_run_metadata() records the
         # environment the pipeline actually ran under, not self.qiime2_env's

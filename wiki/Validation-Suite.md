@@ -25,8 +25,13 @@ Inside an activated QIIME2 conda environment with this package installed (`pip i
 ```bash
 validation/run_validation.sh
 ```
-Exits non-zero on the first failure. Output and logs go to `validation/output/` (gitignored,
-regenerated each run).
+Exits non-zero on the first failure -- including failed *output* checks, not just crashes: one
+taxonomy line per reference sequence for both trainers, a `report.pdf`/`run_metadata.json` and
+every ASV classified to a fungal genus for each scenario, and group-significance results for the
+multi-sample one. Output and logs go to `validation/output/` (gitignored, regenerated each run).
+Needs network access (NCBI Entrez for the 20 reference sequences, and NCBI's ~70 MB
+`taxdump.tar.gz`). A custom `output_dir` is wiped at the start of a run, so the script refuses an
+existing non-empty directory it didn't create itself.
 
 ### `--with-unite` (heavy, opt-in)
 

@@ -21,9 +21,11 @@ def run(fasta_query, id_table, output_folder, taxdump):
     if not id_table.is_file():
         raise ValueError('Your "id-table" is not a file or does not exist.')
 
-    # Checked up front (before a taxdump download and a QIIME2 import): every
-    # sequence needs a taxonomy line, and a mismatch otherwise only surfaces
-    # as an error from deep inside `qiime feature-classifier`.
+    # Checked up front: every sequence needs a taxonomy line. QIIME2 does
+    # *not* complain about a mismatch -- fit-classifier-naive-bayes quietly
+    # trains on whichever sequences do have one (confirmed: it happily fit
+    # 4 of 20 sequences while parse_id_table() was dropping the rest), so
+    # without this check a typo in the table silently shrinks the classifier.
     id_dict = taxonomy.parse_id_table(id_table)  # {accession: taxid}
     fasta_ids = taxonomy.read_fasta_ids(fasta_query)
     if not fasta_ids:

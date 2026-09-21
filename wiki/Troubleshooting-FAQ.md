@@ -47,4 +47,14 @@ depth the classifier actually resolved for your dataset. If you still see this c
 `qiime taxa collapse` yourself, your classifier didn't reach genus for any feature; check the
 `taxonomy.qzv`/`biom_table/taxonomy.tsv` to see how deep your actual assignments go.
 
+**Taxonomy classification runs out of memory.**
+`qiime feature-classifier classify-sklearn` runs `-t/--threads` worker processes, and each one holds
+its own copy of the classifier -- several GB each for a full UNITE classifier. Lower `-t` if the
+classification step gets killed; it is rarely the slow step anyway.
+
+**"These metadata columns become the same name once characters ... are replaced".**
+Per-column results are written to files named after the column, with anything outside
+`A-Z a-z 0-9 . _ -` replaced by `_` -- so e.g. `Host Plant` and `Host_Plant` would overwrite each
+other. Rename one of them.
+
 **Still stuck?** [Open an issue](https://github.com/duceppemo/QIIME2_ITS/issues).

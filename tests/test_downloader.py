@@ -51,6 +51,58 @@ def test_extract_targz_detects_the_archive_by_content_not_name(tmp_path):
     assert (dest_dir / 'content.txt').read_text() == 'payload'
 
 
+def test_extract_targz_accepts_an_uncompressed_tar(tmp_path):
+    """The gzip-under-another-name test above still passes with 'r:gz';
+    only a plain .tar proves the compression is really auto-detected."""
+    src = tmp_path / 'content.txt'
+    src.write_text('payload')
+    archive_path = tmp_path / 'archive.tar'
+    with tarfile.open(archive_path, 'w') as tar:
+        tar.add(src, arcname='content.txt')
+    dest_dir = tmp_path / 'dest'
+    dest_dir.mkdir()
+
+    downloader.extract_targz(archive_path, dest_dir)
+
+    assert (dest_dir / 'content.txt').read_text() == 'payload'
+
+
+class TestExtractWithoutExtractionFilters:
+    """Python < 3.9.17 / 3.10.12 / 3.11.4 has no tarfile.data_filter, and
+    extractall(filter=...) raises TypeError there -- still within this
+    package's requires-python >= 3.9."""
+
+    def _archive(self, tmp_path, arcname):
+        src = tmp_path / 'content.txt'
+        src.write_text('payload')
+        archive_path = tmp_path / 'archive.tar.gz'
+        with tarfile.open(archive_path, 'w:gz') as tar:
+            tar.add(src, arcname=arcname)
+        dest_dir = tmp_path / 'dest'
+        dest_dir.mkdir()
+        return archive_path, dest_dir
+
+    def test_extracts_normally(self, tmp_path, monkeypatch):
+        monkeypatch.delattr(tarfile, 'data_filter')
+        archive_path, dest_dir = self._archive(tmp_path, 'sub/content.txt')
+        real_extractall = tarfile.TarFile.extractall
+
+        def extractall_without_filter_support(self, path='.', members=None, **kwargs):
+            assert 'filter' not in kwargs
+            return real_extractall(self, path, members, filter='fully_trusted')
+
+        monkeypatch.setattr(tarfile.TarFile, 'extractall', extractall_without_filter_support)
+        downloader.extract_targz(archive_path, dest_dir)
+        assert (dest_dir / 'sub' / 'content.txt').read_text() == 'payload'
+
+    def test_still_refuses_path_traversal(self, tmp_path, monkeypatch):
+        monkeypatch.delattr(tarfile, 'data_filter')
+        archive_path, dest_dir = self._archive(tmp_path, '../escaped.txt')
+        with pytest.raises(ValueError, match='unsafe member'):
+            downloader.extract_targz(archive_path, dest_dir)
+        assert not (tmp_path / 'escaped.txt').exists()
+
+
 def test_extract_targz_raises_clearly_for_a_non_archive(tmp_path):
     """Regression test: this used to return silently, so the failure only
     surfaced later as an unrelated-looking missing nodes.dmp/UNITE file."""

@@ -126,6 +126,11 @@ class TestTaxdumpParsing:
         # every accession on the merged taxid is remapped; others untouched
         assert result == {'ACC1': '222', 'ACC2': '222', 'ACC3': '333'}
 
+    def test_apply_merged_taxids_tolerates_blank_and_short_lines(self, tmp_path):
+        merged = tmp_path / 'merged.dmp'
+        merged.write_text('\n111\n111\t|\t222\t|\n')
+        assert taxonomy.apply_merged_taxids({'ACC1': '111'}, merged) == {'ACC1': '222'}
+
     def test_lineage_string_skips_the_intervening_clade(self, taxdump_files):
         """Regression test: a real NCBI lineage has a 'clade' node
         (Opisthokonta) between kingdom and phylum. It must be skipped, not

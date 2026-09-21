@@ -8,11 +8,18 @@ an activated QIIME2 environment just to be imported).
 """
 import csv
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 # Legacy ID-column headers QIIME2 accepts that start with "#" -- every other
 # "#"-prefixed line is a comment (or a "#q2:" directive).
 _HASH_ID_HEADERS = {'#SampleID', '#Sample ID', '#OTUID', '#OTU ID'}
+
+# Terms a "#q2:missing" directive row declares as missing values for a
+# column, per QIIME2's missing-value schemes ("blank", the default, and
+# "no-missing" add nothing beyond the empty cell).
+_MISSING_SCHEME_TERMS = {
+    'INSDC:missing': {'not applicable', 'missing', 'not collected', 'not provided', 'restricted access'},
+}
 
 
 def safe_filename_component(text):
@@ -53,8 +60,12 @@ def read_metadata_rows(path):
     # directives. Comment rows used to be read as samples here.
     header = None
     types_row = None
+    missing_row = None
     data_rows = []
-    with open(path, newline='') as f:
+    # utf-8-sig: a BOM (Excel's "UTF-8" export) in front of a leading
+    # comment row hid its "#", so the comment became the header and every
+    # real column silently disappeared.
+    with open(path, newline='', encoding='utf-8-sig') as f:
         for fields in csv.reader(f, dialect='excel-tab'):
             fields = [field.strip() for field in fields]
             if not any(fields):
@@ -66,12 +77,32 @@ def read_metadata_rows(path):
                 header = fields
             elif first == '#q2:types':
                 types_row = fields[1:]
+            elif first == '#q2:missing':
+                missing_row = fields[1:]
             elif first.startswith('#'):
                 continue
             else:
                 data_rows.append(fields)
     if header is None:
         raise ValueError(f'{path} has no header row.')
+
+    # QIIME2 rejects both of these too -- but only once the pipeline first
+    # hands it the file, after DADA2. Silently keeping the last duplicate
+    # here would let checks() wave the file through.
+    for label, values in (('column names', header[1:]), ('sample ids', [row[0] for row in data_rows])):
+        duplicates = sorted(v for v, n in Counter(values).items() if n > 1)
+        if duplicates:
+            raise ValueError(f'{path}: duplicated {label}: {", ".join(duplicates)}')
+
+    # Cells holding one of a column's declared missing-value terms become
+    # '' here, once, so every caller sees one representation of "missing".
+    if missing_row is not None:
+        for i, scheme in enumerate(missing_row, start=1):
+            terms = _MISSING_SCHEME_TERMS.get(scheme)
+            if terms:
+                for row in data_rows:
+                    if i < len(row) and row[i] in terms:
+                        row[i] = ''
     return header, types_row, data_rows
 
 

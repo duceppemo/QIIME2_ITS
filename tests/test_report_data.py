@@ -375,6 +375,22 @@ class TestParseDistanceMatrix:
         assert df.loc['001', '12'] == 0.5
 
 
+class TestPandasTypeInferenceGuards:
+    def test_dada2_stats_keeps_numeric_looking_sample_ids_as_strings(self, tmp_path):
+        """Without the #q2:types row (whose text keeps the column a string
+        by accident), "001" became the int 1."""
+        path = tmp_path / 'stats.tsv'
+        path.write_text('sample-id\tinput\n001\t100\n12\t90\n')
+        assert list(report_data.parse_dada2_stats(path).index) == ['001', '12']
+
+    def test_genus_table_tolerates_a_feature_without_taxonomy(self, tmp_path):
+        path = tmp_path / 'table.tsv'
+        path.write_text('# Constructed from biom file\n#OTU ID\ts1\ttaxonomy\n'
+                        'f1\t6.0\tk__Fungi; g__Fusarium\nf2\t4.0\t\n')
+        table = report_data.build_genus_abundance_table(path)
+        assert table.loc['Unclassified', 's1'] == pytest.approx(0.4)
+
+
 class TestParseTaxonomyConfidence:
     def test_parses_confidence_column(self, tmp_path):
         path = tmp_path / 'taxonomy.tsv'

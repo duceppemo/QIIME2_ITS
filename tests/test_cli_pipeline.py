@@ -1,4 +1,5 @@
 import gzip
+from pathlib import Path
 
 import pytest
 
@@ -256,6 +257,41 @@ class TestPipelineChecks:
         with pytest.raises(ValueError, match='must not be the input folder or inside'):
             pipeline.checks()
 
+    def test_output_folder_equal_to_the_input_folder_rejected(self, mocker, tmp_path, monkeypatch):
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path, output=str(tmp_path))
+
+        with pytest.raises(ValueError, match='must not be the input folder or inside'):
+            pipeline.checks()
+
+    def test_symlinked_fastq_files_are_not_mistaken_for_subfolder_files(self, mocker, tmp_path, monkeypatch):
+        """Regression test (0.3.1): the subfolder check resolved each *file*,
+        following its symlink, so a flat input folder of symlinks to fastq
+        files stored elsewhere -- a common layout QIIME2 imports fine, and
+        what the error message itself recommends -- was rejected."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path)
+        storage = tmp_path.parent / (tmp_path.name + '_storage')
+        storage.mkdir()
+        real = storage / 'siteC-rep3_S7_L001_R1_001.fastq.gz'
+        with gzip.open(real, 'wt') as f:
+            f.write('@r1\nACGT\n+\nIIII\n')
+        link = tmp_path / real.name
+        link.symlink_to(real)
+        pipeline.fastq_list.append(link)
+
+        pipeline.checks()  # should not raise
+
+    def test_columns_colliding_once_sanitized_for_file_names_rejected(self, mocker, tmp_path, monkeypatch):
+        """ "Host Plant" and "Host_Plant" would both write
+        beta-group-significance-Host_Plant-*.qzv, overwriting each other."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path)
+        Path(pipeline.metadata_file).write_text('sample-id\tHost Plant\tHost_Plant\nsample\tA\tB\n')
+
+        with pytest.raises(ValueError, match='"Host Plant" / "Host_Plant"'):
+            pipeline.checks()
+
     def test_fastq_in_a_subfolder_rejected_unless_reverse_complementing(self, mocker, tmp_path, monkeypatch):
         monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
         pipeline = _make_pipeline(mocker, tmp_path)
@@ -283,6 +319,31 @@ class TestPipelineChecks:
 
         with pytest.raises(ValueError, match='notInMetadata'):
             pipeline.checks()
+
+
+class TestAdvancedStatsAreBestEffort:
+    def test_a_failing_beta_group_significance_column_does_not_abort_the_run(self, mocker, tmp_path, monkeypatch,
+                                                                                 capsys):
+        """Eligibility is computed from the metadata file; QIIME2 decides
+        for itself (e.g. after dropping samples below the sampling depth).
+        One refused column used to kill a run that was already past DADA2."""
+        import subprocess
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path)
+        pipeline.output_folder.mkdir(parents=True)
+        core = pipeline.output_folder / 'core-metrics-results'
+        core.mkdir()
+        (core / 'bray_curtis_distance_matrix.qza').write_bytes(b'')
+        Path(pipeline.metadata_file).write_text(
+            'sample-id\tsite\ns1\tA\ns2\tA\ns3\tB\ns4\tB\n')
+        pipeline.sample_dict = {f's{i}': [] for i in range(1, 5)}
+        wrapper = mocker.patch('qiime2_its.cli.pipeline.qiime_wrapper')
+        wrapper.beta_group_significance.side_effect = subprocess.CalledProcessError(1, 'qiime')
+
+        pipeline._run_advanced_stats('table.qza', 'taxonomy.qza')
+
+        assert 'Skipping bray_curtis group significance for "site"' in capsys.readouterr().out
+        wrapper.taxa_collapse.assert_called_once()  # carried on past the failure
 
 
 class TestThreadsAreHonored:

@@ -32,12 +32,22 @@ Inside an activated QIIME2 conda environment with this package installed (`pip i
 validation/run_validation.sh
 ```
 
-This trains two small real classifiers from bundled data (no multi-GB taxonomy download needed --
-see `data/SOURCES.md`), then runs the scenarios above, writing full pipeline output and logs to
-`validation/output/` (gitignored -- it's regenerated each run, not a permanent record).
+This trains two small real classifiers (the multi-GB `accession2taxid` files are replaced by small
+bundled extracts -- see `data/SOURCES.md`), then runs the scenarios above, writing full pipeline
+output and logs to `validation/output/` (gitignored -- it's regenerated each run, not a permanent
+record). It does need network access: `qiime2-its-train-ncbi` fetches the 20 reference sequences
+from NCBI Entrez and downloads NCBI's `taxdump.tar.gz` (~70 MB; reused for `train-fasta`).
 
-The script exits non-zero on the first failure (`set -euo pipefail`), so a clean exit means every
-scenario completed without error.
+An `output_dir` argument is wiped at the start of each run, so the script refuses an existing,
+non-empty directory it didn't create itself (it marks its own with a `.qiime2_its_validation_output`
+file).
+
+The script exits non-zero on the first failure (`set -euo pipefail`), and a clean exit means more
+than "nothing crashed": each step's *output* is checked too -- one taxonomy line per reference
+sequence for both trainers; a non-empty `report.pdf` and `run_metadata.json` and every ASV
+classified down to a fungal genus for each pipeline scenario; alpha and beta group-significance
+results for the multi-sample scenario. (Exit codes alone let wrong output through twice -- see
+`results/`.)
 
 ## `--with-unite` (heavy, opt-in)
 
@@ -60,8 +70,9 @@ This is **not** part of the default run and nothing from it is bundled in the re
 - the naive-Bayes fit on the full release can take on the order of an **hour or more of CPU time**
   and **several GB of RAM**
 
-Override `UNITE_VERSION`/`UNITE_TAXON_GROUP`/`UNITE_CLUSTER_ID` env vars to use a different release
-than the script's default (`2025-02-19`, `fungi`, `99`); see `qiime rescript get-unite-data --help`
+Override the `UNITE_VERSION`/`UNITE_TAXON_GROUP` env vars to use a different release than the
+script's default (`2025-02-19`, `fungi`; the 99% clustering is fixed, since
+`qiime2-its-train-unite` only picks up the 99% files); see `qiime rescript get-unite-data --help`
 for the currently available versions.
 
 ## `results/`
