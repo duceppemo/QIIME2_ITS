@@ -655,6 +655,12 @@ class TestRunMetadataRows:
         assert 'qiime2-its' in rows['Command invoked']
         assert rows['BBMap (bbduk.sh) version'] == '39.80'
 
+    def test_blanked_user_and_host_read_as_not_recorded(self):
+        """For a report meant to be shared: blanking both fields in
+        run_metadata.json must not render as a bare "@"."""
+        run_metadata = {'environment': {'username': '', 'hostname': ''}}
+        assert dict(report._run_info_rows(run_metadata))['Run by'] == '(not recorded)'
+
     def test_run_duration_omits_zero_leading_units(self):
         """A sub-hour run shouldn't show '0d0h' -- and a multi-day one should
         show real days, not an absurd number of minutes."""

@@ -108,14 +108,17 @@ one_taxonomy_line_per_sequence () {
     n_lines="$(wc -l < "$2")"
     [ "$n_seqs" -gt 0 ] && [ "$n_seqs" -eq "$n_lines" ]
 }
-every_asv_classified_to_a_fungal_genus () {
-    # The bundled reads all come from the genera the toy classifiers are
-    # trained on, so anything short of k__Fungi...g__<Genus> on every ASV
-    # means taxonomy building or training regressed.
-    local tsv="$1/biom_table/taxonomy.tsv" total resolved
+every_asv_classified_as_fungal () {
+    # Deliberately no deeper than kingdom: the bundled reads are an
+    # environmental sample unrelated to the 4 species the toy classifiers
+    # know (see data/SOURCES.md), so *which* lineage they land on says
+    # nothing about correctness -- only that classification ran, produced a
+    # real lineage for every ASV, and didn't fall back to "Unassigned"/
+    # all-"unidentified" (the 2026-09-15 failure).
+    local tsv="$1/biom_table/taxonomy.tsv" total fungal
     total="$(($(wc -l < "$tsv") - 1))"
-    resolved="$(grep -c 'k__Fungi.*g__[A-Z]' "$tsv" || true)"
-    [ "$total" -gt 0 ] && [ "$resolved" -eq "$total" ]
+    fungal="$(grep -c 'k__Fungi;p__[A-Z]' "$tsv" || true)"
+    [ "$total" -gt 0 ] && [ "$fungal" -eq "$total" ]
 }
 any_fungal_asv () {
     grep -q 'k__Fungi' "$1/biom_table/taxonomy.tsv"
@@ -127,8 +130,8 @@ check_pipeline_output () {
     local dir="$1"
     check "$dir: report.pdf written" test -s "$dir/report.pdf"
     check "$dir: run_metadata.json written" test -s "$dir/run_metadata.json"
-    check "$dir: taxonomy (${TAXONOMY_CHECK:-every_asv_classified_to_a_fungal_genus})" \
-        "${TAXONOMY_CHECK:-every_asv_classified_to_a_fungal_genus}" "$dir"
+    check "$dir: taxonomy (${TAXONOMY_CHECK:-every_asv_classified_as_fungal})" \
+        "${TAXONOMY_CHECK:-every_asv_classified_as_fungal}" "$dir"
 }
 
 echo "== Training a small real classifier (NCBI RefSeq fungal ITS accessions) =="
@@ -276,8 +279,8 @@ run_unite_scenario () {
     local saved_classifier="$CLASSIFIER"
     CLASSIFIER="$(find "$OUT/unite_classifier" -maxdepth 1 -name 'unite-*-classifier-*.qza' | head -1)"
 
-    # A real, full-size reference database legitimately leaves some ASVs
-    # short of genus -- only require that classification produced fungi.
+    # A real, full-size reference database can legitimately leave an ASV
+    # unassigned -- only require that classification produced fungi.
     TAXONOMY_CHECK=any_fungal_asv run_case unite_classification "$OUT/unite_pipeline" \
         -i "$DATA/single_end" -se --extract-its2 --taxa Fungi \
         --max-ee 4 --allow-one-off --sampling-depth 10 --max-rarefaction-depth 60

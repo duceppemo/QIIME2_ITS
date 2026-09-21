@@ -1,5 +1,13 @@
 # Validation run: 2026-09-16 (corrects 2026-09-15)
 
+> **Erratum (2026-09-21).** The two classifiers trained in this run (and in 2026-09-15's) had
+> seen only 4 of their 20 reference sequences: a bug in `taxonomy.parse_id_table()` kept one
+> sequence per taxid, and the suite then only checked exit codes. The lineage/rank-mapping fixes
+> described below are real and stand, but "taxonomy now correct" did not hold for what those
+> classifiers could resolve -- no ASV reached species level. Fixed in 0.3.1; re-validated, with
+> output checks added to the suite, in [`../2026-09-21_qiime2-2026.7/SUMMARY.md`](../2026-09-21_qiime2-2026.7/SUMMARY.md).
+> This record is otherwise left as written.
+
 - **QIIME2**: `rachis-qiime2-2026.7` (q2cli 2026.7.0)
 - **ITSxpress**: 2.2.0 (via `qiime itsxpress` plugin)
 - **Result**: all 8 steps (2 classifier trainings + 6 pipeline runs) in `run_validation.sh`

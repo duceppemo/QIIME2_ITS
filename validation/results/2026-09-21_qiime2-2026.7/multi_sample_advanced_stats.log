@@ -1,0 +1,108 @@
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/data/multi_sample as CasavaOneEightSingleLanePerSampleDirFmt to /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/raw-demux-seqs.qza
+Saved SampleData[PairedEndSequencesWithQuality] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/its-demux-seqs.qza
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/its-demux-seqs.qza as SingleLanePerSamplePairedEndFastqDirFmt to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/exported_reads
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/exported_reads as CasavaOneEightSingleLanePerSampleDirFmt to /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/demux-seqs.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/demux-seqs.qzv
+Saved FeatureTable[Frequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/table.qza
+Saved FeatureData[Sequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/rep-seqs.qza
+Saved SampleData[DADA2Stats] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/stats.qza
+Saved DADA2BaseTransitionStats to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/base-transition-stats.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/stats.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/table.qza as BIOMV210DirFmt to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/biom_table
+Saved ImmutableMetadata to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/feature-frequencies.qza
+Saved ImmutableMetadata to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-frequencies.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/table.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/rep-seqs.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/rep-seqs.qza as DNASequencesDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/rep_seqs_export
+Saved FeatureData[AlignedSequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/aligned-rep-seqs.qza
+Saved FeatureData[AlignedSequence] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/masked-aligned-rep-seqs.qza
+Saved Phylogeny[Unrooted] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/unrooted-tree.qza
+Saved Phylogeny[Rooted] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/rooted-tree.qza
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/unrooted-tree.qza as NewickDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats
+Saved FeatureTable[Frequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/rarefied_table.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/faith_pd_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/observed_features_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/shannon_vector.qza
+Saved SampleData[AlphaDiversity] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/evenness_vector.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/unweighted_unifrac_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/weighted_unifrac_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/jaccard_distance_matrix.qza
+Saved DistanceMatrix to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/bray_curtis_distance_matrix.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/unweighted_unifrac_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/weighted_unifrac_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/jaccard_pcoa_results.qza
+Saved PCoAResults to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/bray_curtis_pcoa_results.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/unweighted_unifrac_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/weighted_unifrac_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/jaccard_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/bray_curtis_emperor.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/alpha-rarefaction.qzv
+Saved FeatureData[Taxonomy] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/taxonomy.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/taxonomy.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/taxonomy.qza as TSVTaxonomyDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/biom_table
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/taxa-bar-plots.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-frequencies.qza as ImmutableMetadataDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample_frequencies
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/stats.qza as DADA2StatsDirFmt to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/dada2_stats
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/alpha-group-significance-faith_pd.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/alpha-group-significance-observed_features.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/alpha-group-significance-shannon.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/alpha-group-significance-evenness.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-site-bray_curtis.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-site-unweighted_unifrac.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-replicate-bray_curtis.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-replicate-unweighted_unifrac.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-host-plant-bray_curtis.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-host-plant-unweighted_unifrac.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-collection-date-bray_curtis.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/beta-group-significance-collection-date-unweighted_unifrac.qzv
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/bray_curtis_pcoa_results.qza as OrdinationDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/bray_curtis_pcoa_export
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/bray_curtis_distance_matrix.qza as DistanceMatrixDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/bray_curtis_distance_export
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/unweighted_unifrac_pcoa_results.qza as OrdinationDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/unweighted_unifrac_pcoa_export
+Exported /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/unweighted_unifrac_distance_matrix.qza as DistanceMatrixDirectoryFormat to directory /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/core-metrics-results/unweighted_unifrac_distance_export
+Saved FeatureTable[Frequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/table-genus.qza
+Saved FeatureTable[RelativeFrequency] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/table-genus-relative.qza
+Saved SampleEstimator[Classifier] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/sample_estimator.qza
+Saved FeatureData[Importance] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/feature_importance.qza
+Saved SampleData[ClassifierPredictions] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/predictions.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/model_summary.qzv
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/accuracy_results.qzv
+Saved SampleData[Probabilities] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/probabilities.qza
+Saved Visualization to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/heatmap.qzv
+Saved SampleData[TrueTargets] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/training_targets.qza
+Saved SampleData[TrueTargets] to: /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/sample-classifier-replicate/test_targets.qza
+Importing data into QIIME2...
+Extracting ITS region with ITSxpress...
+Exporting reads for post-processing...
+Checking for empty entries...
+siteA-rep2: input sequences: 49, good: 49, empty: 0
+siteA-rep1: input sequences: 57, good: 57, empty: 0
+siteB-rep2: input sequences: 40, good: 40, empty: 0
+siteB-rep1: input sequences: 50, good: 50, empty: 0
+siteC-rep2: input sequences: 2, good: 2, empty: 0
+siteC-rep1: input sequences: 37, good: 37, empty: 0
+Re-importing processed reads into QIIME2...
+Denoising data with DADA2...
+Exporting BIOM table...
+Summarizing feature table and representative sequences...
+Aligning representative sequences and building phylogenetic tree...
+Analyzing alpha and beta diversity...
+Creating rarefaction plot...
+Assigning taxonomy to representative sequences...
+Exporting taxonomy...
+Incorporating taxonomy into BIOM table...
+Exporting BIOM table with taxonomy...
+Creating bar plot of sample composition...
+Exporting sample read-frequency table...
+Exporting DADA2 denoising stats...
+Testing alpha diversity group significance...
+Testing beta diversity group significance...
+Exporting PCoA ordinations and distance matrices...
+Collapsing feature table to taxonomic level 6...
+Training sample classifiers for eligible metadata columns...
+	Skipping classifier for "site": at least one class has fewer than 2 samples.
+	Skipping classifier for "host-plant": at least one class has fewer than 2 samples.
+	Skipping classifier for "collection-date": at least one class has fewer than 2 samples.
+Writing run provenance metadata...
+Building PDF report...
+Report written to /home/bioinfo/prog/QIIME2_ITS/validation/output/multi_sample_advanced_stats/report.pdf
+DONE!

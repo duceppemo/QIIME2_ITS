@@ -44,8 +44,7 @@ file).
 
 The script exits non-zero on the first failure (`set -euo pipefail`), and a clean exit means more
 than "nothing crashed": each step's *output* is checked too -- one taxonomy line per reference
-sequence for both trainers; a non-empty `report.pdf` and `run_metadata.json` and every ASV
-classified down to a fungal genus for each pipeline scenario; alpha and beta group-significance
+sequence for both trainers; a non-empty `report.pdf` and `run_metadata.json` and every ASV classified as fungal (kingdom + phylum -- the bundled reads are unrelated to the toy classifier's 4 species, so nothing deeper is asserted) for each pipeline scenario; alpha and beta group-significance
 results for the multi-sample scenario. (Exit codes alone let wrong output through twice -- see
 `results/`.)
 

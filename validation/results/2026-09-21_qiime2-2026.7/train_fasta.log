@@ -1,0 +1,11 @@
+Extracting taxdump.tar.gz... took 2s
+Writing taxonomy...Imported /home/bioinfo/prog/QIIME2_ITS/validation/data/classifier_training/seqs.fasta as DNASequencesDirectoryFormat to /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier_fasta/seqs.qza
+Imported /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier_fasta/taxonomy.txt as HeaderlessTSVTaxonomyFormat to /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier_fasta/taxonomy.txt.qza
+/home/bioinfo/miniconda3/envs/rachis-qiime2-2026.7/lib/python3.12/site-packages/q2_feature_classifier/classifier.py:107: UserWarning: The TaxonomicClassifier artifact that results from this method was trained using scikit-learn version 1.7.1. It cannot be used with other versions of scikit-learn. (While the classifier may complete successfully, the results will be unreliable.)
+  warnings.warn(warning, UserWarning)
+Saved TaxonomicClassifier to: /home/bioinfo/prog/QIIME2_ITS/validation/output/classifier_fasta/naive-bayes_classifier.qza
+ took 6s
+Importing sequences into QIIME2...
+Importing taxonomy into QIIME2...
+Training classifier...
+Done (total time: 1m4s).

@@ -391,7 +391,10 @@ def _run_info_rows(run_metadata):
         ('Run started', pipeline.get('start_time', '')),
         ('Run finished', pipeline.get('end_time', '')),
         ('Run duration', timing.format_elapsed(duration) if duration is not None else ''),
-        ('Run by', f"{env.get('username', '')}@{env.get('hostname', '')}"),
+        # Both can be blanked in run_metadata.json before sharing a report
+        # (rebuild it with report.build_report()); a bare "@" reads as a bug.
+        ('Run by', f"{env.get('username', '')}@{env.get('hostname', '')}"
+         if env.get('username') or env.get('hostname') else '(not recorded)'),
         ('Platform', env.get('platform', '')),
         ('Conda environment', env.get('conda_env', '')),
         ('qiime2-its version', pipeline.get('qiime2_its_version', '')),

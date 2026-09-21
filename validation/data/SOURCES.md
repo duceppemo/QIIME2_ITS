@@ -42,12 +42,17 @@ accession/taxid format `qiime2-its-train-fasta` expects, for validating that scr
 (a user-supplied fasta + id table, no NCBI download at all).
 
 This is a small, deliberately narrow classifier (4 taxa) meant to validate that the training and
-classification *code paths* work correctly end-to-end, not to produce biologically comprehensive
-taxonomy. Classifying the bundled `paired_end`/`single_end` reads against it (which are unrelated
-to these 4 taxa) correctly truncates at a shallow, high-confidence rank -- typically
-`k__Fungi;p__Ascomycota` -- rather than an empty/"unidentified" result or a wrong species guess:
-that's `classify-sklearn`'s confidence-based rank truncation working as intended when a read has no
-close match in the reference set, and is the expected outcome here.
+classification *code paths* work correctly end-to-end, not to produce biologically meaningful
+taxonomy. The bundled `paired_end`/`single_end` reads are unrelated to these 4 taxa, so whatever
+lineage they are assigned is only the nearest of the 4 species the classifier knows -- currently a
+confident `...;s__Thermochaetoides_thermophila` for every ASV -- and must not be read as an
+identification. The validation script therefore only asserts that every ASV receives a real fungal
+lineage.
+
+**Erratum (2026-09-21)**: this section used to describe a shallow truncation at
+`k__Fungi;p__Ascomycota` as the expected outcome. That was an artefact of a bug (fixed in 0.3.1)
+that trained these classifiers on 4 of the 20 sequences -- see
+`../results/2026-09-21_qiime2-2026.7/SUMMARY.md`.
 
 **Erratum (2026-09-16)**: `acc2taxid.tsv` originally had corrupted taxid values (Biopython's
 `Entrez.esummary` result stringified as `IntegerElement(559292, attributes={})` instead of `559292`
