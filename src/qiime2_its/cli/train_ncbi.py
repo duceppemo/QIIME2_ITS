@@ -165,7 +165,7 @@ def run(query, output_folder, threads, email, api_key, taxdump, acc2taxid, dead_
     start = time()
     print('Writing taxonomy...', end='', flush=True)
     taxonomy_file = output_folder / 'taxonomy.txt'
-    id_dict = taxonomy.parse_id_table(taxid_file)  # {taxid: accession}
+    id_dict = taxonomy.parse_id_table(taxid_file)  # {accession: taxid}
     taxonomy.write_taxonomy_file(id_dict, taxonomy_file, output_folder / 'nodes.dmp',
                                   output_folder / 'names.dmp', output_folder / 'merged.dmp')
     print(f' took {timing.format_elapsed(time() - start)}')

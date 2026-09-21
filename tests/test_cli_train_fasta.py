@@ -57,7 +57,7 @@ def test_full_run_orchestrates_expected_calls(tmp_path, mocker):
 
     taxonomy_file = output_folder / 'taxonomy.txt'
     mock_write_taxo.assert_called_once_with(
-        {'1001': 'ACC1'}, taxonomy_file,
+        {'ACC1': '1001'}, taxonomy_file,
         output_folder / 'nodes.dmp', output_folder / 'names.dmp', output_folder / 'merged.dmp')
 
     # Regression coverage: import_sequences/import_taxonomy/

@@ -23,7 +23,14 @@ def _opener(path):
 
 
 def parse_id_table(id_table_path):
-    """Parse a 2-column (accession, taxid) TSV into {taxid: accession}."""
+    """Parse a 2-column (accession, taxid) TSV into {accession: taxid}.
+
+    Keyed by accession, not taxid: many reference sequences share one taxid
+    (every ITS record of the same species), so a {taxid: accession} mapping
+    silently keeps only the last accession per taxon -- confirmed against the
+    bundled validation data, where 20 reference sequences produced only 4
+    taxonomy lines, leaving the classifier trained on one sequence per taxon.
+    """
     id_dict = {}
     with _opener(id_table_path)(id_table_path, 'rt') as f:
         for line in f:
@@ -34,7 +41,7 @@ def parse_id_table(id_table_path):
             if len(fields) != 2:
                 raise ValueError('"id_table" must have exactly two tab-separated columns (accession, taxid)')
             acc, taxid = fields
-            id_dict[taxid] = acc
+            id_dict[acc] = taxid
     return id_dict
 
 
@@ -112,15 +119,19 @@ def parse_names_dmp(names_file):
 
 
 def apply_merged_taxids(id_dict, merged_file):
-    """Remap taxids in `id_dict` per NCBI taxdump merged.dmp. Returns a new dict."""
-    id_dict = dict(id_dict)
+    """Remap the taxids in an {accession: taxid} dict per NCBI taxdump
+    merged.dmp (old taxid -> the taxid it was merged into). Returns a new dict."""
+    wanted = set(id_dict.values())
+    merged = {}
     with open(merged_file) as f:
         for line in f:
             fields = line.split('\t')
+            if len(fields) < 3:
+                continue
             old_taxid, new_taxid = fields[0], fields[2]
-            if old_taxid in id_dict:
-                id_dict[new_taxid] = id_dict.pop(old_taxid)
-    return id_dict
+            if old_taxid in wanted:
+                merged[old_taxid] = new_taxid
+    return {acc: merged.get(taxid, taxid) for acc, taxid in id_dict.items()}
 
 
 def lineage_string(taxid, node_dict, names_dict):
@@ -138,14 +149,18 @@ def lineage_string(taxid, node_dict, names_dict):
 
 
 def write_taxonomy_file(id_dict, taxonomy_file, nodes_file, names_file, merged_file):
-    """Write a QIIME2 HeaderlessTSVTaxonomyFormat file from {taxid: accession} + taxdump files."""
+    """Write a QIIME2 HeaderlessTSVTaxonomyFormat file (one line per
+    accession) from an {accession: taxid} dict + taxdump files."""
     node_dict = parse_nodes_dmp(nodes_file)
     names_dict = parse_names_dmp(names_file)
     id_dict = apply_merged_taxids(id_dict, merged_file)
 
+    lineages = {}  # many accessions share a taxid -- walk each lineage once
     with open(taxonomy_file, 'w') as f:
-        for taxid, acc in id_dict.items():
-            f.write(f'{acc}\t{lineage_string(taxid, node_dict, names_dict)}\n')
+        for acc, taxid in id_dict.items():
+            if taxid not in lineages:
+                lineages[taxid] = lineage_string(taxid, node_dict, names_dict)
+            f.write(f'{acc}\t{lineages[taxid]}\n')
 
 
 def max_lineage_depth(taxonomy_tsv_path):

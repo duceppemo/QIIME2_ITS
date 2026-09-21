@@ -21,7 +21,7 @@ def mock_pipeline(mocker):
     mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.extract_accessions_from_fasta', return_value={'ACC1': '1001'})
     mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.parse_accession2taxid', return_value={})
     mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.accessions_to_taxids', return_value=[])
-    mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.parse_id_table', return_value={'1001': 'ACC1'})
+    mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.parse_id_table', return_value={'ACC1': '1001'})
     mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.write_taxonomy_file')
     return {
         'import_seq': mocker.patch('qiime2_its.cli.train_ncbi.qiime_wrapper.import_sequences'),

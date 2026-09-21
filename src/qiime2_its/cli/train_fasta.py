@@ -34,7 +34,7 @@ def run(fasta_query, id_table, output_folder, taxdump):
         downloader.extract_targz(output_folder / 'taxdump.tar.gz', output_folder)
     print(f' took {timing.format_elapsed(time() - start)}')
 
-    id_dict = taxonomy.parse_id_table(id_table)  # {taxid: accession}
+    id_dict = taxonomy.parse_id_table(id_table)  # {accession: taxid}
 
     start = time()
     print('Writing taxonomy...', end='', flush=True)

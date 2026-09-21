@@ -6,15 +6,26 @@ from qiime2_its import taxonomy
 
 
 class TestParseIdTable:
-    def test_parses_two_column_tsv_into_taxid_keyed_dict(self, tmp_path):
+    def test_parses_two_column_tsv_into_accession_keyed_dict(self, tmp_path):
         table = tmp_path / 'id_table.tsv'
         table.write_text('ACC1\t1001\nACC2\t1002\n')
-        assert taxonomy.parse_id_table(table) == {'1001': 'ACC1', '1002': 'ACC2'}
+        assert taxonomy.parse_id_table(table) == {'ACC1': '1001', 'ACC2': '1002'}
+
+    def test_keeps_every_accession_sharing_one_taxid(self, tmp_path):
+        """Regression test: this used to return {taxid: accession}, which
+        structurally can hold only one accession per taxid -- but reference
+        sets routinely have many sequences per species. On the bundled
+        validation data, 20 reference sequences came out as 4 taxonomy
+        lines, so the classifier was silently trained on one sequence per
+        taxon."""
+        table = tmp_path / 'id_table.tsv'
+        table.write_text('ACC1\t1001\nACC2\t1001\nACC3\t1001\n')
+        assert taxonomy.parse_id_table(table) == {'ACC1': '1001', 'ACC2': '1001', 'ACC3': '1001'}
 
     def test_skips_blank_lines(self, tmp_path):
         table = tmp_path / 'id_table.tsv'
         table.write_text('ACC1\t1001\n\nACC2\t1002\n')
-        assert taxonomy.parse_id_table(table) == {'1001': 'ACC1', '1002': 'ACC2'}
+        assert taxonomy.parse_id_table(table) == {'ACC1': '1001', 'ACC2': '1002'}
 
     def test_rejects_wrong_column_count(self, tmp_path):
         table = tmp_path / 'id_table.tsv'
@@ -26,7 +37,7 @@ class TestParseIdTable:
         table = tmp_path / 'id_table.tsv.gz'
         with gzip.open(table, 'wt') as f:
             f.write('ACC1\t1001\n')
-        assert taxonomy.parse_id_table(table) == {'1001': 'ACC1'}
+        assert taxonomy.parse_id_table(table) == {'ACC1': '1001'}
 
 
 class TestExtractAccessionsFromFasta:
@@ -111,9 +122,9 @@ class TestTaxdumpParsing:
     def test_apply_merged_taxids_remaps_old_to_new(self, tmp_path):
         merged = tmp_path / 'merged.dmp'
         merged.write_text('111\t|\t222\t|\n')
-        result = taxonomy.apply_merged_taxids({'111': 'ACC1'}, merged)
-        assert result == {'222': 'ACC1'}
-        assert '111' not in result
+        result = taxonomy.apply_merged_taxids({'ACC1': '111', 'ACC2': '111', 'ACC3': '333'}, merged)
+        # every accession on the merged taxid is remapped; others untouched
+        assert result == {'ACC1': '222', 'ACC2': '222', 'ACC3': '333'}
 
     def test_lineage_string_skips_the_intervening_clade(self, taxdump_files):
         """Regression test: a real NCBI lineage has a 'clade' node
@@ -141,9 +152,21 @@ class TestTaxdumpParsing:
     def test_write_taxonomy_file(self, tmp_path, taxdump_files):
         nodes_file, names_file, merged_file = taxdump_files
         taxonomy_file = tmp_path / 'taxonomy.txt'
-        taxonomy.write_taxonomy_file({'4890': 'ACC1'}, taxonomy_file, nodes_file, names_file, merged_file)
+        taxonomy.write_taxonomy_file({'ACC1': '4890'}, taxonomy_file, nodes_file, names_file, merged_file)
         line = taxonomy_file.read_text().strip()
         assert line.startswith('ACC1\tk__Fungi;p__Ascomycota;')
+
+    def test_write_taxonomy_file_writes_one_line_per_accession(self, tmp_path, taxdump_files):
+        """Every reference sequence needs its own taxonomy line, including
+        several sharing one taxid."""
+        nodes_file, names_file, merged_file = taxdump_files
+        taxonomy_file = tmp_path / 'taxonomy.txt'
+        taxonomy.write_taxonomy_file({'ACC1': '4890', 'ACC2': '4890', 'ACC3': '147545'},
+                                      taxonomy_file, nodes_file, names_file, merged_file)
+        lines = taxonomy_file.read_text().splitlines()
+        assert [line.split('\t')[0] for line in lines] == ['ACC1', 'ACC2', 'ACC3']
+        assert lines[0].split('\t')[1] == lines[1].split('\t')[1]
+        assert 'c__Saccharomycetes' in lines[2]
 
 
 class TestMaxLineageDepth:
