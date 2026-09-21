@@ -35,6 +35,31 @@ def test_raises_if_qiime2_env_not_active(tmp_path, mock_env_check):
         train_fasta.run(fasta, id_table, tmp_path / 'out', taxdump=None)
 
 
+def test_raises_up_front_when_a_fasta_id_is_missing_from_the_id_table(tmp_path, mocker):
+    """Every sequence needs a taxonomy line; without this check the mismatch
+    only surfaces from deep inside `qiime feature-classifier`, after a
+    taxdump download and two imports."""
+    fasta = tmp_path / 'seqs.fasta'
+    fasta.write_text('>ACC1 desc\nACGT\n>ACC2.1\nACGT\n')
+    id_table = tmp_path / 'ids.tsv'
+    id_table.write_text('ACC1\t1001\nACC2\t1002\n')  # ACC2, not ACC2.1
+    mock_download = mocker.patch('qiime2_its.cli.train_fasta.downloader.download')
+
+    with pytest.raises(ValueError, match=r'ACC2\.1'):
+        train_fasta.run(fasta, id_table, tmp_path / 'out', taxdump=None)
+
+    mock_download.assert_not_called()
+
+
+def test_raises_on_a_fasta_with_no_sequences(tmp_path):
+    fasta = tmp_path / 'seqs.fasta'
+    fasta.write_text('')
+    id_table = tmp_path / 'ids.tsv'
+    id_table.write_text('ACC1\t1001\n')
+    with pytest.raises(ValueError, match='No sequences'):
+        train_fasta.run(fasta, id_table, tmp_path / 'out', taxdump=None)
+
+
 def test_full_run_orchestrates_expected_calls(tmp_path, mocker):
     fasta = tmp_path / 'seqs.fasta'
     fasta.write_text('>ACC1\nACGT\n')

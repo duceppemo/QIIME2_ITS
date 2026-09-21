@@ -56,7 +56,54 @@ class TestReadMetadataTable:
         assert table['sampleC']['site'] == 'siteB'
 
 
+class TestReadMetadataRows:
+    def test_comment_rows_are_not_samples(self, tmp_path):
+        """QIIME2 ignores "#"-prefixed rows (anywhere, including before the
+        header) and empty rows; they used to be read as samples here."""
+        path = tmp_path / 'metadata.tsv'
+        path.write_text(
+            '# exported from the LIMS\n'
+            'sample-id\tsite\n'
+            '#q2:types\tcategorical\n'
+            '# second batch below\n'
+            '\t\n'
+            'sampleA\tsiteA\n'
+        )
+        assert metadata_utils.read_metadata_table(path) == {'sampleA': {'site': 'siteA'}}
+        assert metadata_utils.parse_metadata_columns(path) == {'site': 'categorical'}
+
+    def test_legacy_hash_id_header_is_the_header_not_a_comment(self, tmp_path):
+        path = tmp_path / 'metadata.tsv'
+        path.write_text('#SampleID\tsite\nsampleA\tsiteA\n')
+        assert metadata_utils.read_metadata_table(path) == {'sampleA': {'site': 'siteA'}}
+
+    def test_cells_are_stripped_and_quotes_honored(self, tmp_path):
+        path = tmp_path / 'metadata.tsv'
+        path.write_text('sample-id\tsite\nsampleA \t"site A"\n')
+        assert metadata_utils.read_metadata_table(path) == {'sampleA': {'site': 'site A'}}
+
+    def test_raises_clearly_without_a_header(self, tmp_path):
+        path = tmp_path / 'metadata.tsv'
+        path.write_text('# only a comment\n')
+        with pytest.raises(ValueError, match='no header'):
+            metadata_utils.read_metadata_table(path)
+
+
 class TestClassSizes:
+    def test_missing_values_are_not_a_group(self, tmp_path):
+        """Regression test: '' used to count as a class, so one real group
+        plus two blanks read as two groups of >=2 -- "eligible" -- and
+        beta-group-significance then failed the whole run on that column."""
+        path = tmp_path / 'metadata.tsv'
+        path.write_text(
+            'sample-id\tsite\n#q2:types\tcategorical\n'
+            'sampleA\tsiteA\nsampleB\tsiteA\nsampleC\t\nsampleD\t\n'
+        )
+        ids = ['sampleA', 'sampleB', 'sampleC', 'sampleD']
+        assert metadata_utils.class_sizes(path, 'site', ids) == {'siteA': 2}
+        assert metadata_utils.eligible_categorical_columns(path, ids) == []
+        assert metadata_utils.has_alpha_group_significance_column(path, ids) is False
+
     def test_counts_values_for_given_samples(self, metadata_with_types):
         counts = metadata_utils.class_sizes(metadata_with_types, 'site',
                                              ['sampleA', 'sampleB', 'sampleC'])

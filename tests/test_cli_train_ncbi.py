@@ -152,3 +152,38 @@ class TestRun:
 
         recorded = (output_folder / 'seq.fasta.query_hash').read_text().strip()
         assert recorded == train_ncbi._query_fingerprint('some query')
+
+    def test_raises_before_the_big_downloads_when_ncbi_returns_no_sequences(self, tmp_path, mock_pipeline, mocker):
+        """A query with no hits leaves an empty seq.fasta: fail with the real
+        reason before fetching multi-GB accession2taxid files, and don't
+        record the empty file as a finished download for this query."""
+        mocker.patch('qiime2_its.cli.train_ncbi.taxonomy.extract_accessions_from_fasta', return_value={})
+        mock_download = mocker.patch('qiime2_its.cli.train_ncbi.downloader.download')
+        output_folder = tmp_path / 'out'
+
+        with pytest.raises(ValueError, match='No sequences were downloaded'):
+            train_ncbi.run('no hits query', output_folder, 4, 'a@b.com', None, None, None, None)
+
+        mock_download.assert_not_called()
+        assert not (output_folder / 'seq.fasta.query_hash').exists()
+
+    def test_a_crashed_download_does_not_leave_the_previous_query_hash_behind(self, tmp_path, mock_pipeline, mocker):
+        """Regression test: query A succeeds, then a download for query B
+        crashes midway over the same seq.fasta. A's fingerprint used to stay
+        on disk, so re-running A "matched" and trained on B's partial file."""
+        output_folder = tmp_path / 'out'
+        output_folder.mkdir()
+        (output_folder / 'seq.fasta').write_text('>A1\nACGT\n')
+        hash_file = output_folder / 'seq.fasta.query_hash'
+        hash_file.write_text(train_ncbi._query_fingerprint('query A') + '\n')
+
+        def _crash(query, seq_file, email, api_key):
+            seq_file.write_text('>B1\nAC')  # partial
+            raise ConnectionError('network died')
+
+        mocker.patch('qiime2_its.cli.train_ncbi.download_sequences', side_effect=_crash)
+        with pytest.raises(ConnectionError):
+            train_ncbi.run('query B', output_folder, 4, 'a@b.com', None,
+                            tmp_path / 'taxdump.tar.gz', tmp_path / 'acc2taxid.gz', tmp_path / 'dead.gz')
+
+        assert not hash_file.exists()

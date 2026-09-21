@@ -45,6 +45,12 @@ def parse_id_table(id_table_path):
     return id_dict
 
 
+def read_fasta_ids(input_fasta):
+    """Sequence IDs (header text up to the first whitespace) of a fasta[.gz], in file order."""
+    with _opener(input_fasta)(input_fasta, 'rt') as f:
+        return [line[1:].split()[0] for line in f if line.startswith('>') and line[1:].strip()]
+
+
 def extract_accessions_from_fasta(input_fasta, acc_file):
     """Write one accession per line (from fasta headers) to `acc_file`; return {accession: ''}."""
     acc_dict = {}

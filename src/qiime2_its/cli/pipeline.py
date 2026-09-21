@@ -156,7 +156,10 @@ class Pipeline:
         masked_qza = self.output_folder / 'masked-aligned-rep-seqs.qza'
         unrooted_qza = self.output_folder / 'unrooted-tree.qza'
         rooted_qza = self.output_folder / 'rooted-tree.qza'
-        qiime_wrapper.phylogeny(repseq_qza, aligned_qza, masked_qza, unrooted_qza, rooted_qza)
+        # n_threads/n_jobs=self.cpu: both steps used to grab every core on
+        # the machine ('auto' / 0) no matter what -t/--threads asked for.
+        qiime_wrapper.phylogeny(repseq_qza, aligned_qza, masked_qza, unrooted_qza, rooted_qza,
+                                 n_threads=self.cpu)
         qiime_wrapper.export(unrooted_qza, self.output_folder)
 
         print('Analyzing alpha and beta diversity...')
@@ -170,7 +173,7 @@ class Pipeline:
 
         print('Assigning taxonomy to representative sequences...')
         taxonomy_qza = self.output_folder / 'taxonomy.qza'
-        qiime_wrapper.classify(self.qiime2_classifier, repseq_qza, taxonomy_qza)
+        qiime_wrapper.classify(self.qiime2_classifier, repseq_qza, taxonomy_qza, n_jobs=self.cpu)
         qiime_wrapper.metadata_tabulate(taxonomy_qza, self.output_folder / 'taxonomy.qzv')
 
         print('Exporting taxonomy...')
@@ -378,6 +381,13 @@ class Pipeline:
         if not self.fastq_list:
             raise ValueError('No fastq files found in the provided input folder.')
 
+        # Neither file is touched until after DADA2 (the metadata) or after
+        # phylogeny + diversity (the classifier) -- a typo in either path
+        # otherwise only surfaces hours into a real run.
+        for label, path in (('metadata', self.metadata_file), ('classifier', self.qiime2_classifier)):
+            if not Path(path).is_file():
+                raise ValueError(f'The {label} file does not exist: {path}')
+
         fastq_utils.validate_casava_filenames(self.fastq_list)
 
         empty_samples = sorted({Path(fq).name.split('_')[0] for fq in self.fastq_list
@@ -401,6 +411,18 @@ class Pipeline:
                 raise ValueError(
                     'The following sample(s) are missing an R1 or R2 mate file: {}. Paired-end mode '
                     '("-pe") requires exactly two files per sample.'.format(', '.join(unpaired_samples)))
+
+        # Same reasoning as the file checks above: QIIME2 refuses a feature
+        # table holding sample IDs absent from the metadata, but only once
+        # `feature-table summarize` runs, i.e. after DADA2 has finished.
+        metadata_ids = set(metadata_utils.read_metadata_table(self.metadata_file))
+        missing_from_metadata = sorted(sample for sample in fastq_utils.parse_fastq_list(self.fastq_list)
+                                        if sample not in metadata_ids)
+        if missing_from_metadata:
+            raise ValueError(
+                'The following sample(s) have fastq files but no row in the metadata file {}: {}. Sample '
+                'IDs are the part of each fastq file name before the first "_".'.format(
+                    self.metadata_file, ', '.join(missing_from_metadata)))
 
         # Stashed on self (not just a local) so _write_run_metadata() records the
         # environment the pipeline actually ran under, not self.qiime2_env's

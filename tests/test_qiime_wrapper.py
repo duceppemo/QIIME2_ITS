@@ -174,6 +174,20 @@ def test_sample_summarize(mock_run):
                     '--o-sample-frequencies', 'sf.qza']
 
 
+def test_phylogeny_passes_the_thread_count(mock_run):
+    qiime_wrapper.phylogeny('rep.qza', 'aln.qza', 'masked.qza', 'unrooted.qza', 'rooted.qza', n_threads=4)
+    assert mock_run.call_args.args[0] == [
+        'qiime', 'phylogeny', 'align-to-tree-mafft-fasttree', '--p-n-threads', '4',
+        '--i-sequences', 'rep.qza', '--o-alignment', 'aln.qza', '--o-masked-alignment', 'masked.qza',
+        '--o-tree', 'unrooted.qza', '--o-rooted-tree', 'rooted.qza']
+
+
+def test_classify_passes_the_job_count(mock_run):
+    qiime_wrapper.classify('clf.qza', 'rep.qza', 'taxo.qza', n_jobs=4)
+    cmd = mock_run.call_args.args[0]
+    assert cmd[cmd.index('--p-n-jobs') + 1] == '4'
+
+
 def test_classify(mock_run):
     qiime_wrapper.classify('clf.qza', 'rep.qza', 'taxo.qza')
     cmd = mock_run.call_args.args[0]

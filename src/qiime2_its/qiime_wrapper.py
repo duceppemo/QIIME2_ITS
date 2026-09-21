@@ -157,9 +157,11 @@ def seq_summary(repseqs_qza, repseqs_qzv):
     _run(cmd)
 
 
-def phylogeny(repseqs_qza, align_repseqs_qza, masked_align_repseqs_qza, unrooted_tree_qza, rooted_tree_qza):
+def phylogeny(repseqs_qza, align_repseqs_qza, masked_align_repseqs_qza, unrooted_tree_qza, rooted_tree_qza,
+              n_threads='auto'):
+    """`n_threads`: a thread count, or 'auto' for every available core."""
     cmd = ['qiime', 'phylogeny', 'align-to-tree-mafft-fasttree',
-           '--p-n-threads', 'auto',
+           '--p-n-threads', str(n_threads),
            '--i-sequences', str(repseqs_qza),
            '--o-alignment', str(align_repseqs_qza),
            '--o-masked-alignment', str(masked_align_repseqs_qza),

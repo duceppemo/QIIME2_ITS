@@ -91,6 +91,14 @@ def _make_pipeline(mocker, tmp_path, **overrides):
     args = parser.parse_args(argv)
     args.input = str(tmp_path)
     args.output = str(tmp_path / 'out')
+    # Real files: checks() verifies both exist and that every fastq sample
+    # has a metadata row.
+    metadata = tmp_path / 'meta.tsv'
+    metadata.write_text('sample-id\tsite\nsample\tA\nsiteC-rep3\tA\nsiteD-rep9\tB\n')
+    classifier = tmp_path / 'clf.qza'
+    classifier.write_bytes(b'')
+    args.metadata = str(metadata)
+    args.classifier = str(classifier)
     for key, value in overrides.items():
         setattr(args, key, value)
     mocker.patch.object(Pipeline, 'run', lambda self: None)
@@ -224,6 +232,60 @@ class TestPipelineChecks:
         pipeline = _make_pipeline(mocker, tmp_path)  # se=True (default), single R1-only fastq
 
         pipeline.checks()  # should not raise: single-end mode doesn't require R2s
+
+
+    @pytest.mark.parametrize('argument, label', [('metadata', 'metadata'), ('classifier', 'classifier')])
+    def test_missing_metadata_or_classifier_file_rejected_up_front(self, mocker, tmp_path, monkeypatch,
+                                                                   argument, label):
+        """Neither file is read until after DADA2 (metadata) or after
+        phylogeny + diversity (classifier) -- a typo in the path used to
+        surface only hours into a real run."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path, **{argument: str(tmp_path / 'typo')})
+
+        with pytest.raises(ValueError, match=f'{label} file does not exist'):
+            pipeline.checks()
+
+    def test_sample_missing_from_metadata_rejected_up_front(self, mocker, tmp_path, monkeypatch):
+        """QIIME2 refuses a feature table with sample IDs absent from the
+        metadata, but only at `feature-table summarize` -- after DADA2."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        pipeline = _make_pipeline(mocker, tmp_path)
+        extra = tmp_path / 'notInMetadata_S3_L001_R1_001.fastq.gz'
+        with gzip.open(extra, 'wt') as f:
+            f.write('@r1\nACGT\n+\nIIII\n')
+        pipeline.fastq_list.append(extra)
+
+        with pytest.raises(ValueError, match='notInMetadata'):
+            pipeline.checks()
+
+
+class TestThreadsAreHonored:
+    def test_phylogeny_and_classification_use_the_requested_thread_count(self, mocker, tmp_path, monkeypatch):
+        """Regression test: both steps used to take every core on the
+        machine ('auto' / n_jobs=0) regardless of -t/--threads."""
+        monkeypatch.setenv('CONDA_DEFAULT_ENV', 'rachis-qiime2-2026.7')
+        parser = build_parser()
+        fq = tmp_path / 'in' / 'sample_bc_L001_R1_001.fastq.gz'
+        fq.parent.mkdir()
+        with gzip.open(fq, 'wt') as f:
+            f.write('@r1\nACGT\n+\nIIII\n')
+        metadata = tmp_path / 'meta.tsv'
+        metadata.write_text('sample-id\tsite\nsample\tA\n')
+        classifier = tmp_path / 'clf.qza'
+        classifier.write_bytes(b'')
+        args = parser.parse_args(['-q', 'rachis-qiime2-2026.7', '-i', str(fq.parent), '-o', str(tmp_path / 'out'),
+                                  '-m', str(metadata), '-c', str(classifier), '-se', '-t', '2',
+                                  '--skip-advanced-stats', '--skip-report'])
+        mocker.patch('qiime2_its.cli.pipeline.env_checks.clamp_cpu', return_value=2)
+        wrapper = mocker.patch('qiime2_its.cli.pipeline.qiime_wrapper')
+        mocker.patch('qiime2_its.cli.pipeline.biom_utils')
+        mocker.patch.object(Pipeline, '_write_run_metadata')
+
+        Pipeline(args)
+
+        assert wrapper.phylogeny.call_args.kwargs['n_threads'] == 2
+        assert wrapper.classify.call_args.kwargs['n_jobs'] == 2
 
 
 class TestWriteRunMetadata:

@@ -50,7 +50,8 @@ def download_sequences(query, seq_file, email, api_key):
 
     with open(seq_file, 'w') as out_handle:
         if os.path.isfile(query):
-            acc_list = [line.strip() for line in open(query) if line.strip()]
+            with open(query) as acc_fh:
+                acc_list = [line.strip() for line in acc_fh if line.strip()]
             count = len(acc_list)
             print(f'Downloading {count} records...')
             for start in range(0, count, BATCH_SIZE):
@@ -102,8 +103,12 @@ def run(query, output_folder, threads, email, api_key, taxdump, acc2taxid, dead_
     # file's content for an accession-list query) is recorded alongside it
     # so a different query reusing the same -o output folder is detected and
     # re-downloaded instead of silently training on the wrong sequences.
-    # This does not detect a partial file left behind by a crashed download
-    # for the *same* query -- delete seq.fasta yourself to force a retry.
+    # The fingerprint is removed before a download starts and only written
+    # back once it completes, so a crashed/partial download is never
+    # mistaken for a finished one. (Leaving the old fingerprint in place
+    # was a real hole: query A succeeds, a download for query B crashes
+    # midway over the same seq.fasta, and re-running A would then "match"
+    # and train on B's partial file.)
     if seq_file.exists() and previous_fingerprint == current_fingerprint:
         print(f'{seq_file} already exists and matches the current query, reusing it instead of '
               f're-downloading -- delete it (or use a different -o) to force a fresh download.')
@@ -111,8 +116,23 @@ def run(query, output_folder, threads, email, api_key, taxdump, acc2taxid, dead_
         if seq_file.exists():
             print(f'{seq_file} exists but is for a different query (or no record of the query that '
                   f'produced it was found) -- re-downloading for the current query.')
+        query_hash_file.unlink(missing_ok=True)
         download_sequences(query, seq_file, email, api_key)
         query_hash_file.write_text(current_fingerprint + '\n')
+
+    start = time()
+    print('Extracting accession numbers from fasta file...', end='', flush=True)
+    acc_file = output_folder / 'acc.list'
+    acc_dict = taxonomy.extract_accessions_from_fasta(seq_file, acc_file)
+    print(f' took {timing.format_elapsed(time() - start)}')
+    if not acc_dict:
+        # A query with no hits (or a list of accessions NCBI doesn't know)
+        # downloads an empty fasta -- stop here with the real reason instead
+        # of downloading/parsing multi-GB accession2taxid files and then
+        # failing inside QIIME2 on an empty import.
+        query_hash_file.unlink(missing_ok=True)
+        raise ValueError(f'No sequences were downloaded from NCBI for query "{query}" -- check the query '
+                         f'(try it at https://www.ncbi.nlm.nih.gov/nuccore first).')
 
     start = time()
     if taxdump:
@@ -137,12 +157,6 @@ def run(query, output_folder, threads, email, api_key, taxdump, acc2taxid, dead_
         downloader.download(DEAD_ACC2TAXID_URL, output_folder / 'dead_nucl.accession2taxid.gz')
         dead_acc2taxid = output_folder / 'dead_nucl.accession2taxid.gz'
         print(f' took {timing.format_elapsed(time() - start)}')
-
-    start = time()
-    print('Extracting accession numbers from fasta file...', end='', flush=True)
-    acc_file = output_folder / 'acc.list'
-    acc_dict = taxonomy.extract_accessions_from_fasta(seq_file, acc_file)
-    print(f' took {timing.format_elapsed(time() - start)}')
 
     start = time()
     print('Parsing nucl_gb.accession2taxid.gz...', end='', flush=True)

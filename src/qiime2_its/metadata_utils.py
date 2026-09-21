@@ -6,7 +6,12 @@ columns to run group-significance tests and sample-classifier against without
 needing the qiime2 Python API (which would tie this module to running inside
 an activated QIIME2 environment just to be imported).
 """
+import csv
 from collections import defaultdict
+
+# Legacy ID-column headers QIIME2 accepts that start with "#" -- every other
+# "#"-prefixed line is a comment (or a "#q2:" directive).
+_HASH_ID_HEADERS = {'#SampleID', '#Sample ID', '#OTUID', '#OTU ID'}
 
 
 def _is_numeric(value):
@@ -27,18 +32,32 @@ def read_metadata_rows(path):
     the file doesn't have one. `data_rows` is every remaining row, each a
     list of fields (sample-id first).
     """
-    with open(path) as f:
-        lines = [line.rstrip('\n') for line in f if line.strip()]
-    header = lines[0].split('\t')
-
+    # Same rules as QIIME2's own metadata reader: excel-tab CSV dialect
+    # (quoted cells), leading/trailing whitespace stripped from every cell,
+    # empty rows ignored, and "#"-prefixed rows are comments wherever they
+    # appear -- except the legacy "#SampleID"-style ID headers and "#q2:"
+    # directives. Comment rows used to be read as samples here.
+    header = None
     types_row = None
     data_rows = []
-    for line in lines[1:]:
-        fields = line.split('\t')
-        if fields[0] == '#q2:types':
-            types_row = fields[1:]
-        else:
-            data_rows.append(fields)
+    with open(path, newline='') as f:
+        for fields in csv.reader(f, dialect='excel-tab'):
+            fields = [field.strip() for field in fields]
+            if not any(fields):
+                continue
+            first = fields[0]
+            if header is None:
+                if first.startswith('#') and first not in _HASH_ID_HEADERS:
+                    continue
+                header = fields
+            elif first == '#q2:types':
+                types_row = fields[1:]
+            elif first.startswith('#'):
+                continue
+            else:
+                data_rows.append(fields)
+    if header is None:
+        raise ValueError(f'{path} has no header row.')
     return header, types_row, data_rows
 
 
@@ -78,10 +97,16 @@ def read_metadata_table(path):
 
 
 def _class_sizes(table, column, sample_ids):
+    """Missing (empty) values are not a group: QIIME2 drops those samples
+    from group-significance tests and sample classification. Counting ''
+    as a class made a column with one real group plus two or more blanks
+    look "eligible", and `qiime diversity beta-group-significance` then
+    failed the whole run on it."""
     counts = defaultdict(int)
     for sample_id in sample_ids:
-        if sample_id in table:
-            counts[table[sample_id].get(column, '')] += 1
+        value = table.get(sample_id, {}).get(column, '')
+        if value != '':
+            counts[value] += 1
     return dict(counts)
 
 

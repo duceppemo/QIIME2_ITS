@@ -20,6 +20,20 @@ def run(fasta_query, id_table, output_folder, taxdump):
         raise ValueError('Your "query" is not a file or does not exist.')
     if not id_table.is_file():
         raise ValueError('Your "id-table" is not a file or does not exist.')
+
+    # Checked up front (before a taxdump download and a QIIME2 import): every
+    # sequence needs a taxonomy line, and a mismatch otherwise only surfaces
+    # as an error from deep inside `qiime feature-classifier`.
+    id_dict = taxonomy.parse_id_table(id_table)  # {accession: taxid}
+    fasta_ids = taxonomy.read_fasta_ids(fasta_query)
+    if not fasta_ids:
+        raise ValueError(f'No sequences found in {fasta_query}.')
+    missing = [seq_id for seq_id in fasta_ids if seq_id not in id_dict]
+    if missing:
+        shown = ', '.join(missing[:10]) + (f', ... ({len(missing)} in total)' if len(missing) > 10 else '')
+        raise ValueError(f'These sequence IDs from {fasta_query.name} are missing from the id-table '
+                         f'{id_table.name}: {shown}. IDs (everything before the first whitespace in each '
+                         f'fasta header) must match the table\'s first column exactly.')
     output_folder.mkdir(parents=True, exist_ok=True)
 
     t_zero = time()
@@ -33,8 +47,6 @@ def run(fasta_query, id_table, output_folder, taxdump):
         downloader.download(TAXDUMP_URL, output_folder / 'taxdump.tar.gz')
         downloader.extract_targz(output_folder / 'taxdump.tar.gz', output_folder)
     print(f' took {timing.format_elapsed(time() - start)}')
-
-    id_dict = taxonomy.parse_id_table(id_table)  # {accession: taxid}
 
     start = time()
     print('Writing taxonomy...', end='', flush=True)
