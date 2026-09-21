@@ -1,0 +1,55 @@
+sample-id	country	env-medium	env-local-scale	collection-date	elevation-m	replicate
+#q2:types	categorical	categorical	categorical	categorical	numeric	categorical
+K.BeL.1.1	Poland	soil	planted forest	2018-10-30	217	biological replicate 1
+K.BeL.1.2	Poland	soil	planted forest	2018-10-30	217	biological replicate 2
+K.CSL.1.1	Poland	soil	meadow ecosystem	2018-07-08	41	biological replicate 1
+K.CSL.1.2	Poland	soil	meadow ecosystem	2018-07-08	41	biological replicate 2
+K.CT9.1.1	Poland	soil	salt contaminated soil	2018-07-08	42	biological replicate 1
+K.CtE.1.2	Poland	soil	salt contaminated soil	2018-07-08	42	biological replicate 2
+K.Ira.13.2	Iran	contaminated soil	oil contaminated soil	2018-01-15	169	biological replicate 2
+K.KKF.1.1	Poland	soil	factory	2018-06-25	188	biological replicate 1
+K.KKF.1.2	Poland	soil	factory	2018-06-25	188	biological replicate 2
+K.KKF.2.1	Poland	soil	factory	2018-06-25	187	biological replicate 1
+K.KKF.2.2	Poland	soil	factory	2018-06-25	187	biological replicate 2
+K.Leg.1.1	Poland	metal contaminated soil	lawn soil	2018-06-26	122	biological replicate 1
+K.Leg.1.2	Poland	metal contaminated soil	lawn soil	2018-06-26	122	biological replicate 2
+K.WKJ.2.1	Poland	soil	lake coast	2018-06-25	541	biological replicate 1
+K.WKJ.2.2	Poland	soil	lake coast	2018-06-25	541	biological replicate 2
+K.ZER.1.1	Poland	soil	lawn soil	2018-06-08	102	biological replicate 1
+K.ZER.1.2	Poland	soil	lawn soil	2018-06-08	102	biological replicate 2
+K.ZER.2.1	Poland	soil	lawn soil	2018-06-08	83	biological replicate 1
+K.ZER.2.2	Poland	soil	lawn soil	2018-06-08	83	biological replicate 2
+K.ZST.1.1	Poland	calcisol	roadside	2018-06-25	330	biological replicate 1
+K.ZST.1.2	Poland	calcisol	roadside	2018-06-25	330	biological replicate 2
+P.BeL.1.1	Poland	soil	coal mine	2018-10-30	204	biological replicate 1
+P.BeL.1.2	Poland	soil	coal mine	2018-10-30	204	biological replicate 2
+P.BeL.2.1	Poland	soil	coal mine	2018-10-30	200	biological replicate 1
+P.BeL.2.2	Poland	soil	coal mine	2018-10-30	200	biological replicate 2
+P.Bob.1.2	Poland	contaminated soil	oil well	2018-06-01	342	biological replicate 1
+P.Ira	Iran	contaminated soil	oil contaminated soil	2018-01-15	169	biological replicate 1
+P.Ira.13.2	Iran	contaminated soil	oil contaminated soil	2018-01-15	324	biological replicate 1
+P.Ira.6	Iran	contaminated soil	oil contaminated soil	2018-01-15	324	biological replicate 2
+P.KKF.1.1	Poland	contaminated soil	factory	2018-06-25	190	biological replicate 1
+P.KKF.1.2	Poland	contaminated soil	factory	2018-06-25	190	biological replicate 2
+P.KKF.2.1	Poland	contaminated soil	factory	2018-06-25	190	biological replicate 1
+P.KKF.2.2	Poland	contaminated soil	factory	2018-06-25	190	biological replicate 2
+P.Leg.1.1	Poland	metal contaminated soil	factory	2018-06-26	164	biological replicate 1
+P.Leg.1.2	Poland	metal contaminated soil	factory	2018-06-26	164	biological replicate 2
+P.Leg.2.1	Poland	metal contaminated soil	factory	2018-06-26	169	biological replicate 1
+P.Leg.2.2	Poland	metal contaminated soil	factory	2018-06-26	169	biological replicate 2
+P.Leg.3.1	Poland	metal contaminated soil	factory	2018-06-26	166	biological replicate 1
+P.Leg.3.2	Poland	metal contaminated soil	factory	2018-06-26	166	biological replicate 2
+P.RM.2.1	Poland	contaminated soil	self-heating coal mine waste material	2018-07-30	299	biological replicate 1
+P.RM.2.2	Poland	contaminated soil	self-heating coal mine waste material	2018-07-30	299	biological replicate 2
+P.Rm.1.1	Poland	contaminated soil	self-heating coal mine waste material	2018-07-30	290	biological replicate 1
+P.Rm.1.2	Poland	contaminated soil	self-heating coal mine waste material	2018-07-30	290	biological replicate 2
+P.Rop	Poland	contaminated soil	oil seep	2018-06-01	489	biological replicate 1
+P.Rop.1.2	Poland	contaminated soil	oil seep	2018-06-01	489	biological replicate 2
+P.WJB.1.1	Poland	soil	lake coast	2018-06-25	641	biological replicate 1
+P.WJB.1.2	Poland	soil	lake coast	2018-06-25	641	biological replicate 2
+P.WRJ.1.1	Poland	soil	lake coast	2018-06-25	559	biological replicate 1
+P.WRJ.1.2	Poland	soil	lake coast	2018-06-25	559	biological replicate 2
+P.ZER.1.1	Poland	contaminated soil	flood plain	2018-06-08	88	biological replicate 1
+P.ZER.1.2	Poland	contaminated soil	flood plain	2018-06-08	88	biological replicate 2
+P.ZER.2.1	Poland	contaminated soil	flood plain	2018-06-08	88	biological replicate 1
+P.ZER.2.2	Poland	contaminated soil	flood plain	2018-06-08	88	biological replicate 2

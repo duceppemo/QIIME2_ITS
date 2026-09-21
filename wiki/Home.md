@@ -19,6 +19,8 @@ run. Everything else lives here:
   naming scheme, common gotchas
 - **[Advanced stats and the PDF report](Advanced-Stats-and-Report)** — group-significance tests,
   genus-level composition, sample classification, `report.pdf`
+- **[Worked example](Worked-Example)** — a real 53-sample public dataset from SRA accession to PDF
+  report: every script, the metadata, and the report itself to look at before you try it
 - **[Validation suite](Validation-Suite)** — the real-data validation suite and its audit trail
 - **[Development](Development)** — running the unit tests, project layout
 - **[Troubleshooting / FAQ](Troubleshooting-FAQ)**

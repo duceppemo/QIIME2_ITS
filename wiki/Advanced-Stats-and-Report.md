@@ -1,5 +1,7 @@
 # Advanced stats and the PDF report
 
+> **See one first:** the [worked example](Worked-Example) publishes a complete real report (37 pages).
+
 By default, after the core pipeline (import → ITSxpress → DADA2 → phylogeny → diversity →
 taxonomy → barplot), `qiime2-its` also runs:
 

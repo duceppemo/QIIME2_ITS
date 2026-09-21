@@ -17,6 +17,10 @@
   classification, and a PDF summary report.
 </p>
 
+**See it before you try it:** a complete [example report (PDF)](https://github.com/duceppemo/QIIME2_ITS/blob/master/examples/PRJNA767765/report.pdf)
+from a real 53-sample public SRA dataset, with every script needed to reproduce it --
+[worked example](https://github.com/duceppemo/QIIME2_ITS/wiki/Worked-Example).
+
 ## Quick start
 
 ```bash
@@ -44,8 +48,8 @@ qiime2-its \
 
 That's the short version. **[See the wiki](https://github.com/duceppemo/QIIME2_ITS/wiki) for:**
 full installation, building a classifier (UNITE/NCBI/your own fasta), the complete flag reference,
-fastq/metadata requirements, the diversity-stats-and-PDF-report feature, the real-data validation
-suite, and troubleshooting.
+fastq/metadata requirements, the diversity-stats-and-PDF-report feature, a worked example on public SRA
+data, the real-data validation suite, and troubleshooting.
 
 ## License
 

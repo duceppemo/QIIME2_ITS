@@ -8,6 +8,7 @@
 
 **Features**
 - [Advanced stats & PDF report](Advanced-Stats-and-Report)
+- [Worked example (public SRA data)](Worked-Example)
 
 **Project**
 - [Validation suite](Validation-Suite)
