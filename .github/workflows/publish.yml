@@ -1,0 +1,58 @@
+name: publish
+
+# Publishes to PyPI on every vX.Y.Z tag push, via PyPI trusted publishing
+# (OIDC): no API token is stored anywhere. PyPI is configured to trust this
+# exact workflow file name in this repository, running in the "pypi"
+# GitHub environment, which only allows v* tags to deploy.
+#
+# `workflow_dispatch` builds and checks the package without publishing --
+# a way to test this workflow (or inspect what would ship) from any branch.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - name: Tag must match the package version
+        if: github.ref_type == 'tag'
+        run: |
+          version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          test "v$version" = "${GITHUB_REF_NAME}" || {
+            echo "tag ${GITHUB_REF_NAME} != pyproject.toml version $version" >&2; exit 1; }
+      - run: python -m build
+      - run: python -m twine check --strict dist/*
+      - name: Installed package works
+        run: |
+          pip install dist/*.whl
+          qiime2-its --version
+          python -c "import qiime2_its.report"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/qiime2-its/
+    permissions:
+      id-token: write   # OIDC token for trusted publishing
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

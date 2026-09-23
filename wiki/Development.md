@@ -13,14 +13,18 @@ a plain Python interpreter — no QIIME2 installation required. CI runs them on 
 
 ## Releasing
 
-Bump the version in `pyproject.toml`, `src/qiime2_its/_version.py` and `CITATION.cff` (plus its
-`date-released`), commit, tag `vX.Y.Z`, push both, and create the GitHub release. Then publish to
-PyPI from a clean export of the tag, so no untracked file can leak into the package:
-```bash
-mkdir /tmp/release && git archive vX.Y.Z | tar -x -C /tmp/release && cd /tmp/release
-python -m build && python -m twine check dist/* && python -m twine upload dist/*
-```
-Finally `scripts/sync_wiki.sh`.
+1. Bump the version in `pyproject.toml`, `src/qiime2_its/_version.py` and `CITATION.cff` (plus its
+   `date-released`); run the tests; commit and push.
+2. Tag and push the tag: `git tag -a vX.Y.Z -m "qiime2-its X.Y.Z" && git push origin vX.Y.Z`.
+   That triggers `.github/workflows/publish.yml`, which builds the package, checks that the tag
+   matches the version in `pyproject.toml`, installs the wheel, and publishes it to PyPI through
+   [trusted publishing](https://docs.pypi.org/trusted-publishers/) (OIDC from the `pypi` GitHub
+   environment, restricted to `v*` tags -- no API token is stored anywhere).
+3. Create the GitHub release (`gh release create vX.Y.Z --title vX.Y.Z --notes-file ...`).
+4. `scripts/sync_wiki.sh`.
+
+To test the publish workflow without publishing, run it manually from the Actions tab
+(`workflow_dispatch`): the build/check/install steps run, the publish job is skipped.
 
 ## Project layout
 
