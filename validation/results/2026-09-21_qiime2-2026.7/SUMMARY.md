@@ -73,3 +73,20 @@ beta-group-significance, and the report fixes (real column names, shared group c
 
 Logs in this directory are from this run; paths were rewritten from the scratch output folder it
 used to the default `validation/output/` for readability.
+
+## Addendum (2026-09-23): `--with-unite` run
+
+`run_validation.sh --with-unite` (same code, plus the opt-in UNITE scenario): all 9 steps passed
+and all 25 output checks passed (`output_checks_with_unite.log`; logs `unite_download.log`,
+`unite_train.log`, `unite_classification.log`). UNITE 2025-02-19 (fungi, 99%, no singletons)
+fetched via `rescript`; `qiime2-its-train-unite` trained the full classifier in **1 h 43 min**; the
+`single_end` reads then classified against it in an 11-minute pipeline run.
+
+The point of this scenario, next to the toy-classifier ones above: the same 19 `single_end` ASVs
+that the 4-species toy classifier assigns *en bloc* to `Thermochaetoides thermophila` come out of
+the real classifier as **19 distinct lineages** across three phyla (Ascomycota, Mortierellomycota,
+Chytridiomycota) -- 15 resolved to genus or below, 14 to a UNITE species hypothesis (`sh__`), 1
+stopping at phylum. That is what an environmental soil sample against a complete reference looks
+like, and it is why the suite's taxonomy check for the toy scenarios asserts nothing beyond
+"a real fungal lineage". UNITE's 8-field lineages (`...;s__X;sh__SH…`) went through the genus-level
+collapse and the report's genus parsing without incident.

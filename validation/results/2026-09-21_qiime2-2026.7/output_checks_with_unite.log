@@ -1,0 +1,36 @@
+== Training a small real classifier (NCBI RefSeq fungal ITS accessions) ==
+  ok: train_ncbi: one taxonomy line per downloaded sequence
+== Training a classifier from a fasta + id-table (train_fasta) ==
+  ok: train_fasta: one taxonomy line per input sequence
+== paired_end ==
+  ok: paired_end: report.pdf written
+  ok: paired_end: run_metadata.json written
+  ok: paired_end: taxonomy (every_asv_classified_as_fungal)
+== single_end ==
+  ok: single_end: report.pdf written
+  ok: single_end: run_metadata.json written
+  ok: single_end: taxonomy (every_asv_classified_as_fungal)
+== paired_end_size_filter ==
+  ok: paired_end_size_filter: report.pdf written
+  ok: paired_end_size_filter: run_metadata.json written
+  ok: paired_end_size_filter: taxonomy (every_asv_classified_as_fungal)
+== single_end_reverse_complement ==
+  ok: single_end_reverse_complement: report.pdf written
+  ok: single_end_reverse_complement: run_metadata.json written
+  ok: single_end_reverse_complement: taxonomy (every_asv_classified_as_fungal)
+== fasta_classifier_classification ==
+  ok: fasta_classifier_pipeline: report.pdf written
+  ok: fasta_classifier_pipeline: run_metadata.json written
+  ok: fasta_classifier_pipeline: taxonomy (every_asv_classified_as_fungal)
+== multi_sample_advanced_stats ==
+  ok: multi_sample_advanced_stats: report.pdf written
+  ok: multi_sample_advanced_stats: run_metadata.json written
+  ok: multi_sample_advanced_stats: taxonomy (every_asv_classified_as_fungal)
+  ok: multi_sample_advanced_stats: beta group-significance results written
+  ok: multi_sample_advanced_stats: alpha group-significance results written
+== unite (heavy: real UNITE 2025-02-19 download, full training, real classification) ==
+== unite_classification ==
+  ok: unite_pipeline: report.pdf written
+  ok: unite_pipeline: run_metadata.json written
+  ok: unite_pipeline: taxonomy (any_fungal_asv)
+All validation scenarios completed successfully.
