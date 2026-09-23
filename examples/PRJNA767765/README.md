@@ -23,9 +23,9 @@ program path were blanked in `run_metadata.json` and the PDF was rebuilt from th
 
 ## Reproduce it
 
-Inside an activated QIIME2 conda environment with `qiime2-its` installed (see
-[Installation](https://github.com/duceppemo/QIIME2_ITS/wiki/Installation)), from an empty working
-folder with ~15 GB free:
+Inside an activated QIIME2 conda environment with `qiime2-its` installed (`pip install qiime2-its`,
+see [Installation](https://github.com/duceppemo/QIIME2_ITS/wiki/Installation)) and a clone of this
+repository for the scripts, from an empty working folder with ~15 GB free:
 
 ```bash
 EX=/path/to/QIIME2_ITS/examples/PRJNA767765

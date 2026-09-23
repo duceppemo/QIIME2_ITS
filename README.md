@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://github.com/duceppemo/QIIME2_ITS/actions/workflows/tests.yml"><img src="https://github.com/duceppemo/QIIME2_ITS/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
   <a href="https://github.com/duceppemo/QIIME2_ITS/blob/master/LICENSE"><img src="https://img.shields.io/github/license/duceppemo/QIIME2_ITS" alt="license"></a>
+  <a href="https://pypi.org/project/qiime2-its/"><img src="https://img.shields.io/pypi/v/qiime2-its" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python 3.9+">
   <img src="https://img.shields.io/badge/QIIME2-2026.x-blue" alt="QIIME2 2026.x">
 </p>
@@ -34,9 +35,7 @@ conda activate rachis-qiime2-$VERSION
 conda install -c bioconda -c conda-forge itsxpress bbmap
 qiime dev refresh-cache
 
-git clone https://github.com/duceppemo/QIIME2_ITS
-cd QIIME2_ITS
-pip install -e .
+pip install qiime2-its
 
 # 3. Run it:
 qiime2-its \

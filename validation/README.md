@@ -25,7 +25,8 @@ See `data/SOURCES.md` for where the bundled data comes from and its licensing.
 
 ## Running it
 
-Inside an activated QIIME2 conda environment with this package installed (`pip install -e .`) and
+Inside an activated QIIME2 conda environment with this package installed from this clone
+(`pip install -e .` -- the suite is not part of the PyPI package) and
 `bbduk.sh` on PATH (`conda install -c bioconda -c conda-forge bbmap` -- see the main README):
 
 ```bash

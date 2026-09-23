@@ -1,6 +1,8 @@
 # Development
 
 ```bash
+git clone https://github.com/duceppemo/QIIME2_ITS
+cd QIIME2_ITS
 pip install -e '.[dev]'
 pytest -v
 ```
@@ -8,6 +10,17 @@ pytest -v
 All unit tests mock external tool invocations (`qiime`, `biom`, `bbduk.sh`, etc.), so they run with
 a plain Python interpreter — no QIIME2 installation required. CI runs them on every push (see
 `.github/workflows/tests.yml`).
+
+## Releasing
+
+Bump the version in `pyproject.toml`, `src/qiime2_its/_version.py` and `CITATION.cff` (plus its
+`date-released`), commit, tag `vX.Y.Z`, push both, and create the GitHub release. Then publish to
+PyPI from a clean export of the tag, so no untracked file can leak into the package:
+```bash
+mkdir /tmp/release && git archive vX.Y.Z | tar -x -C /tmp/release && cd /tmp/release
+python -m build && python -m twine check dist/* && python -m twine upload dist/*
+```
+Finally `scripts/sync_wiki.sh`.
 
 ## Project layout
 

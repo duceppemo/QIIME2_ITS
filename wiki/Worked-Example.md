@@ -36,8 +36,9 @@ see [Advanced stats and the PDF report](Advanced-Stats-and-Report) for what each
 
 ## Reproduce it
 
-Inside an activated QIIME2 environment with `qiime2-its` installed ([Installation](Installation)),
-from an empty working folder with ~15 GB free:
+Inside an activated QIIME2 environment with `qiime2-its` installed (`pip install qiime2-its`, see
+[Installation](Installation)) and a clone of the repository for the scripts, from an empty working
+folder with ~15 GB free:
 
 ```bash
 EX=/path/to/QIIME2_ITS/examples/PRJNA767765

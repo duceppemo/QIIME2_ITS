@@ -22,12 +22,14 @@
    conda install -c bioconda -c conda-forge itsxpress bbmap
    qiime dev refresh-cache                # picks up the newly installed itsxpress plugin
 
-   git clone https://github.com/duceppemo/QIIME2_ITS
-   cd QIIME2_ITS
-   pip install -e .
+   pip install qiime2-its                 # from PyPI: https://pypi.org/project/qiime2-its/
 
    # Test the pipeline:
    qiime2-its -h
    ```
+   `pip install qiime2-its` must run *inside* the activated QIIME2 environment: the package
+   drives that environment's `qiime` command and checks for it at start-up. To upgrade later,
+   `pip install -U qiime2-its` in the same environment. To work from a clone instead (for the
+   validation suite, or to contribute), see [Development](Development).
 
 Next: [build a classifier](Building-a-Classifier), then see [Pipeline usage](Pipeline-Usage).

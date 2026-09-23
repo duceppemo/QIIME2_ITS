@@ -20,7 +20,8 @@ Scenarios covered by the default run:
 
 ## Running it
 
-Inside an activated QIIME2 conda environment with this package installed (`pip install -e .`) and
+Inside an activated QIIME2 conda environment with this package installed from a clone of the
+repository (`pip install -e .` -- the suite's data and script are not part of the PyPI package) and
 `bbduk.sh` on `PATH` (see [Installation](Installation)):
 ```bash
 validation/run_validation.sh
