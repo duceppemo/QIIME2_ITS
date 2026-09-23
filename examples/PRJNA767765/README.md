@@ -40,7 +40,7 @@ THREADS=40 PARALLEL=10 bash $EX/04_run_pipeline.sh   # -> ./output/report.pdf
 |---|---|
 | [`01_fetch_metadata.py`](01_fetch_metadata.py) | Builds the QIIME2 metadata file and the download manifest from two public APIs (ENA file report, NCBI BioSample) -- standard library only. Its output is committed here as [`metadata.tsv`](metadata.tsv) and [`download_manifest.tsv`](download_manifest.tsv), so this step is optional; it exists so nothing in the example is hand-made. |
 | [`02_download_reads.sh`](02_download_reads.sh) | Downloads each run's two fastq files from ENA under the Casava-style names QIIME2 requires (`<sample>_S<n>_L001_R1_001.fastq.gz`), checking every file against ENA's MD5. |
-| [`03_train_classifier.sh`](03_train_classifier.sh) | Fetches UNITE with QIIME2's `rescript` plugin and trains the naive-Bayes classifier. |
+| [`03_train_classifier.sh`](03_train_classifier.sh) | Fetches UNITE with QIIME2's `rescript` plugin and trains the naive-Bayes classifier (about 1 h 40 min on the same workstation; the fit is single-threaded). |
 | [`04_run_pipeline.sh`](04_run_pipeline.sh) | The analysis itself: one `qiime2-its` command. |
 
 The run behind `report.pdf` used `qiime2-its` 0.3.2 on QIIME2 2026.7, with 40 threads /

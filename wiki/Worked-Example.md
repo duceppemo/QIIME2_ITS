@@ -65,7 +65,7 @@ PERMANOVA permutations are random), not different conclusions.
 |---|---|
 | [`01_fetch_metadata.py`](https://github.com/duceppemo/QIIME2_ITS/blob/master/examples/PRJNA767765/01_fetch_metadata.py) | Builds the QIIME2 metadata file and the download manifest from two public APIs (ENA file report, NCBI BioSample); standard library only. Its output is committed, so this step is optional -- it exists so nothing in the example is hand-made. |
 | [`02_download_reads.sh`](https://github.com/duceppemo/QIIME2_ITS/blob/master/examples/PRJNA767765/02_download_reads.sh) | Downloads each run's fastq pair from ENA under the [Casava-style names](Metadata-and-FASTQ-Requirements) QIIME2 requires, checking every file against ENA's MD5. |
-| [`03_train_classifier.sh`](https://github.com/duceppemo/QIIME2_ITS/blob/master/examples/PRJNA767765/03_train_classifier.sh) | Fetches UNITE with QIIME2's `rescript` plugin and trains the naive-Bayes classifier (see also [Building a classifier](Building-a-Classifier)). |
+| [`03_train_classifier.sh`](https://github.com/duceppemo/QIIME2_ITS/blob/master/examples/PRJNA767765/03_train_classifier.sh) | Fetches UNITE with QIIME2's `rescript` plugin and trains the naive-Bayes classifier -- about 1 h 40 min, single-threaded (see also [Building a classifier](Building-a-Classifier)). |
 | [`04_run_pipeline.sh`](https://github.com/duceppemo/QIIME2_ITS/blob/master/examples/PRJNA767765/04_run_pipeline.sh) | The `qiime2-its` command above. |
 
 [`metadata.tsv`](https://github.com/duceppemo/QIIME2_ITS/blob/master/examples/PRJNA767765/metadata.tsv) is also a realistic template for your own metadata file.
