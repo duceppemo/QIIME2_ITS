@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/duceppemo/QIIME2_ITS/actions/workflows/tests.yml"><img src="https://github.com/duceppemo/QIIME2_ITS/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="https://codecov.io/gh/duceppemo/QIIME2_ITS"><img src="https://codecov.io/gh/duceppemo/QIIME2_ITS/graph/badge.svg" alt="coverage"></a>
   <a href="https://github.com/duceppemo/QIIME2_ITS/blob/master/LICENSE"><img src="https://img.shields.io/github/license/duceppemo/QIIME2_ITS" alt="license"></a>
   <a href="https://pypi.org/project/qiime2-its/"><img src="https://img.shields.io/pypi/v/qiime2-its" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="python 3.9+">
